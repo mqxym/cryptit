@@ -1,1 +1,0 @@
-{"version":3,"file":"provider.js","sourceRoot":"","sources":["../../../../packages/node-runtime/src/provider.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,SAAS,EAAE,cAAc,EAAE,MAAM,aAAa,CAAC;AAGxD,MAAM,CAAC,MAAM,YAAY,GAAmB;IAC1C,sEAAsE;IACtE,MAAM,EAAE,SAAS,CAAC,MAAiC;IACnD,eAAe,CAAC,GAAG;QACjB,cAAc,CAAC,GAAG,CAAC,CAAC;QACpB,OAAO,GAAG,CAAC;IACb,CAAC;IACD,MAAM,EAAE,IAAI;CACb,CAAC"}
