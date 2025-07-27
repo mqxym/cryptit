@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "declarationDir": "../../build/node-runtime",
+    "rootDir": "src",
+    "types": ["node"],                        // Node globals & fs/stream types
+    "tsBuildInfoFile": "../../build/node-runtime/.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    { "path": "../core" }                     // depends on core
+  ]
+}

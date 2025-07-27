@@ -1,0 +1,14 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  test-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v1
+        with: { bun-version: 1.x }
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
+      - run: bun test --coverage
+      - run: bun run build
