@@ -9,5 +9,5 @@ export const browserProvider: CryptoProvider = {
   getRandomValues(buf) {
     return globalThis.crypto.getRandomValues(buf);
   },
-  isNode: false             // <- distinguishes from nodeProvider
+  isNode: false
 };

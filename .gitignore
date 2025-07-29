@@ -2,4 +2,6 @@ node_modules/
 .DS_Store
 *.bun-build
 build/
-dist/cryptit
+dist/bin/cryptit
+*.tmp
+scan.md

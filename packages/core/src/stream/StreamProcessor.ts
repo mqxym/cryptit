@@ -9,39 +9,21 @@ export class StreamProcessor {
     private readonly chunkSize = 512 * 1024,
   ) {}
 
-  // ─────────────────────────────────────────────────────────────
-  //  Encrypt: prepend header once, then run EncryptTransform
-  // ─────────────────────────────────────────────────────────────
-  encryptionStream(header: Uint8Array): TransformStream<Uint8Array, Uint8Array> {
-    let pushed = false;
-    const prepend = new TransformStream<Uint8Array, Uint8Array>({
-      transform(chunk, ctl) {
-        if (!pushed) {
-          ctl.enqueue(header);
-          pushed = true;
-        }
-        ctl.enqueue(chunk);
-      },
-    });
-
-    const encrypted = new EncryptTransform(this.engine, this.chunkSize)
-      .toTransformStream();
-
-    /* .readable → pipeThrough → returns ReadableStream
-       Cast back to TransformStream so callers can use it with
-       Readable.pipeThrough(transform). */
-    return {
-  writable: prepend.writable,          // upstream entry
-  readable: prepend.readable
-              .pipeThrough(encrypted),    // downstream exit
-} as unknown as TransformStream<Uint8Array, Uint8Array>;
-  }
-
+encryptionStream(): TransformStream<Uint8Array, Uint8Array> {
+  const enc = new EncryptTransform(this.engine, this.chunkSize)
+                .toTransformStream();
+  /* return an object that really has BOTH ends */
+  return {
+    writable: enc.writable,
+    readable: enc.readable,
+  } as TransformStream<Uint8Array, Uint8Array>;
+}
   // ─────────────────────────────────────────────────────────────
   //  Decrypt: strip header bytes first, then run DecryptTransform
   // ─────────────────────────────────────────────────────────────
   decryptionStream(headerLen: number): TransformStream<Uint8Array, Uint8Array> {
     let skip = headerLen;
+    console.log(skip)
     const strip = new TransformStream<Uint8Array, Uint8Array>({
       transform(chunk, ctl) {
         if (skip === 0) {

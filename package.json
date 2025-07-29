@@ -1,40 +1,50 @@
 {
-  "name": "@mqxym/cryptit",
-  "version": "0.2.0",
-  "type": "module",
-  "workspaces": ["packages/*"],
-  "scripts": {
-    "build:dts": "tsc -b",
-    "build": "bun run build:js && bun run build:dts",
-    "build:js": "bun run bun.build.js",
-    "dev": "bun build bun.build.js --watch",
-    "test": "bun test",
-    "lint": "eslint . --ext .ts",
-    "cli:run": "bun run packages/node-runtime/src/cli.ts"
-  },
-  "bin": {
-    "cryptit": "./dist/cryptit"
-  },
-  "engines": {
-    "bun": ">=1.0.0"
-  },
-  "dependencies": {
-    "argon2": "^0.43.1",
-    "argon2-browser": "^1.18.0",
-    "commander": "^11.0.1"
-  },
-  "devDependencies": {
-    "@types/jest": "^30.0.0",
-    "@types/node": "^24.1.0",
-    "eslint": "^8.57.0",
-    "typescript": "^5.5.0"
-  },
+    "name": "@mqxym/cryptit",
+    "version": "0.2.0",
+    "type": "module",
+    "workspaces": [
+        "packages/*"
+    ],
+    "scripts": {
+        "build:dts": "tsc -b",
+        "build": "bun run build:js && bun run build:dts",
+        "build:js": "bun run bun.build.js",
+        "dev": "bun build bun.build.js --watch",
+        "test": "bun test",
+        "lint": "eslint . --ext .ts",
+        "cli:run": "bun run packages/node-runtime/src/cli.ts"
+    },
+    "engines": {
+        "bun": ">=1.0.0"
+    },
+    "dependencies": {
+        "argon2": "^0.43.1",
+        "argon2-browser": "^1.18.0",
+        "commander": "^11.0.1"
+    },
+    "devDependencies": {
+        "@types/jest": "^30.0.0",
+        "@types/node": "^24.1.0",
+        "eslint": "^8.57.0",
+        "typescript": "^5.5.0"
+    },
+
   "exports": {
     ".": {
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.cjs"
+      "import": "./dist/cryptit.index.mjs/index.js",
+      "require": "./dist/cryptit.index.cjs/index.js"
     },
-    "./cli": "./dist/index.cjs",
-    "./browser": "./dist/browser.min.js"
+    "./browser": {
+      "import": "./dist/cryptit.browser.min.js/index.js",
+      "require": "./dist/cryptit.browser.min.js/index.js"
+    },
+    "./cli": {
+      "import": "./dist/cryptit.cli.mjs/cli.js",
+      "require": "./dist/cryptit.cli.cjs/cli.js"
+    },
+    "./*.wasm": "./dist/*.wasm"
+  },
+  "bin": {
+    "cryptit": "./dist/bin/cryptit"
   }
 }

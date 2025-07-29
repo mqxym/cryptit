@@ -24,6 +24,13 @@ export interface EncryptionConfig {
   chunkSize?: number;
 }
 
+export interface EncryptStreamResult {
+  header: Uint8Array;
+  writable: WritableStream<Uint8Array>;
+  readable: ReadableStream<Uint8Array>;
+}
+
+
 // ────────────────────────────────────────────────────────────────────────────
 //  Main high-level façade
 // ────────────────────────────────────────────────────────────────────────────
@@ -113,69 +120,101 @@ export class Cryptit {
   // ──────────────────────────────────────────────────
   //  STREAM-BASED (piping) helpers – for CLI, etc.
   // ──────────────────────────────────────────────────
-  async createEncryptionStream(pass: string): Promise<TransformStream> {
-    const salt = this.genSalt();
-    await this.algo.deriveKey(pass, salt, this.difficulty);
-    const header = encodeHeader(this.difficulty, this.saltStrength, salt);
-    return this.streamer.encryptionStream(header);
+
+async createEncryptionStream(pass: string): Promise<EncryptStreamResult> {
+  const salt  = this.genSalt();
+  await this.algo.deriveKey(pass, salt, this.difficulty);
+
+  const header = encodeHeader(this.difficulty, this.saltStrength, salt);
+  const tf     = this.streamer.encryptionStream();      // headerless
+
+  return { header, writable: tf.writable, readable: tf.readable };
+}
+// ───────────────────────────────────────────────
+//  Streaming decrypt (header-aware)
+// ───────────────────────────────────────────────
+async createDecryptionStream(
+  passphrase: string
+): Promise<TransformStream<Uint8Array, Uint8Array>> {
+
+  const self = this;
+  let buf    = new Uint8Array(0);
+  let derived = false;
+  let downstream!: TransformStream<Uint8Array, Uint8Array>;
+
+  /** pumps decryptTs.readable → outer controller continuously */
+  async function startPump(
+    readable: ReadableStream<Uint8Array>,
+    ctl: TransformStreamDefaultController<Uint8Array>
+  ) {
+    const reader = readable.getReader();
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      ctl.enqueue(value);
+    }
   }
 
-  async createDecryptionStream(pass: string): Promise<TransformStream> {
-    // Dynamically buffer header, then hand off to real decrypt stream.
-    // Keeps memory footprint low for large files.
-    const self = this;
-    let headerBuf = new Uint8Array(0);
-    let downstream: TransformStream<Uint8Array, Uint8Array> | null = null;
-    let writer: WritableStreamDefaultWriter<Uint8Array> | null = null;
+  return new TransformStream<Uint8Array, Uint8Array>({
+    async transform(chunk, ctl) {
+      if (!derived) {
+        // accumulate header
+        buf = self.concat(buf, chunk);
+        if (buf.length < 2) return;
 
-    return new TransformStream<Uint8Array, Uint8Array>({
-      async transform(chunk, ctl) {
-        if (downstream) {
-          await writer!.write(chunk);
-          return;
+        const saltFlag = ((buf[1] >> 2) & 1) ? "high" : "low";
+        const hdrLen   = 2 + DefaultConfig.saltLengths[saltFlag];
+        if (buf.length < hdrLen) return;
+
+        // parse + derive
+        const header = buf.slice(0, hdrLen);
+        const { salt, difficulty } = decodeHeader(header);
+        await self.algo.deriveKey(passphrase, salt, difficulty);
+
+        // set up decrypt transform (no further header skipping)
+        downstream = new DecryptTransform(self.algo, self.chunkSize)
+                       .toTransformStream();
+
+        // begin pumping plaintext out
+        startPump(downstream.readable, ctl);   // fire-and-forget
+
+        // push remainder (ciphertext after header) into decrypt
+        const rem = buf.slice(hdrLen);
+        if (rem.length) {
+          const w = downstream.writable.getWriter();
+          await w.write(rem);
+          w.releaseLock();
         }
+        derived = true;
+        return;
+      }
 
-        // accumulate until full header present
-        const tmp = new Uint8Array(headerBuf.length + chunk.length);
-        tmp.set(headerBuf);
-        tmp.set(chunk, headerBuf.length);
-        headerBuf = tmp;
+      // after derivation every chunk is plain ciphertext
+      const w = downstream.writable.getWriter();
+      await w.write(chunk);
+      w.releaseLock();
+    },
 
-        if (headerBuf.length < 2) return;
-
-        const strong = ((headerBuf[1] >> 2) & 1) ? "high" : "low";
-        const expect = 2 + DefaultConfig.saltLengths[strong];
-        if (headerBuf.length < expect) return;
-
-        // header complete → derive key & create downstream pipeline
-        const head = headerBuf.slice(0, expect);
-        const rest = headerBuf.slice(expect);
-
-        const meta = decodeHeader(head);
-        await self.algo.deriveKey(pass, meta.salt, meta.difficulty);
-
-        downstream = self.streamer.decryptionStream(expect);
-        writer     = (downstream.writable as WritableStream<Uint8Array>).getWriter();
-
-        if (rest.length) await writer.write(rest);
-        if (chunk.length > rest.length) {
-          // any bytes from 'chunk' after header have already been forwarded
-          const extra = chunk.slice(rest.length);
-          if (extra.length) await writer.write(extra);
-        }
-
-        // pipe subsequent chunks directly
-        ctl.enqueue = (x: Uint8Array) => writer!.write(x) as unknown as void;
-      },
-      async flush() {
-        await writer?.close();
-      },
-    });
-  }
+    async flush() {
+      if (derived) {
+        const w = downstream.writable.getWriter();
+        await w.close();              // let pump finish
+        w.releaseLock();
+      }
+    }
+  });
+}
 
   // ──────────────────────────────────────────────────
   //  Helpers
   // ──────────────────────────────────────────────────
+  concat(a: Uint8Array, b: Uint8Array): Uint8Array {
+  const out = new Uint8Array(a.length + b.length);
+  out.set(a, 0);
+  out.set(b, a.length);
+  return out;
+}
+
   private genSalt(): Uint8Array {
     const len = DefaultConfig.saltLengths[this.saltStrength];
     return this.provider.getRandomValues(new Uint8Array(len));

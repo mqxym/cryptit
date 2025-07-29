@@ -1,5 +1,5 @@
-import { webcrypto, randomFillSync } from "node:crypto";
-import type { CryptoProvider } from "../../core/src/providers/CryptoProvider.js";
+import { webcrypto, randomFillSync } from 'node:crypto';
+import type { CryptoProvider } from '../../core/src/providers/CryptoProvider.js';
 
 export const nodeProvider: CryptoProvider = {
   // cast is safe: Node’s SubtleCrypto is a superset of the browser spec
@@ -8,5 +8,5 @@ export const nodeProvider: CryptoProvider = {
     randomFillSync(buf);
     return buf;
   },
-  isNode: true
+  isNode: true,
 };

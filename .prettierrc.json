@@ -1,0 +1,21 @@
+{
+    "printWidth": 1000,
+    "tabWidth": 4,
+    "useTabs": false,
+    "semi": true,
+    "singleQuote": true,
+    "bracketSpacing": true,
+    "arrowParens": "always",
+    "endOfLine": "lf",
+    "htmlWhitespaceSensitivity": "ignore",
+    "singleAttributePerLine": false,
+    "overrides": [
+    {
+      "files": "*.ts",
+      "options": {
+        "tabWidth": 2,
+        "printWidth": 150
+      }
+    }
+  ]
+  }
