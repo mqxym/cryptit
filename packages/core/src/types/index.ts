@@ -1,25 +1,37 @@
-import { CryptoProvider } from "../providers/CryptoProvider.js";
+import type { CryptoProvider } from '../providers/CryptoProvider.js';
 
-export interface VersionDescriptor {
-  /** 3-bit header field: 0 … 7 */
-  readonly id: number;
-  readonly cipher: new (p: CryptoProvider) => EncryptionAlgorithm;
-  readonly kdf: KeyDerivation;
-  readonly saltLengths: Record<'low' | 'high', number>;
-  readonly difficulties: Record<string, unknown>;
-  readonly defaultChunkSize: number;
-}
-
+/* ------------------------- Encryption engine ------------------------- */
 export interface EncryptionAlgorithm {
-  encryptChunk(plain: Uint8Array): Promise<Uint8Array>;
+  encryptChunk(plain : Uint8Array): Promise<Uint8Array>;
   decryptChunk(cipher: Uint8Array): Promise<Uint8Array>;
 }
 
-export interface KeyDerivation {
+/* ------------------------- Key derivation ---------------------------- */
+export interface KeyDerivation<D extends string = string> {
+  readonly name: string;
   derive(
-    passphrase: Uint8Array | string,
-    salt: Uint8Array,
-    difficulty: string,
-    provider: CryptoProvider
+    passphrase : Uint8Array | string,
+    salt       : Uint8Array,
+    difficulty : D,
+    provider   : CryptoProvider,
   ): Promise<CryptoKey>;
+}
+
+/* ---------------------------------------------------------------------
+   Generic descriptor of one “format version”.
+
+   S = salt-strength keys  (e.g. "low" | "high")
+   D = difficulty presets  (e.g. "low" | "middle" | "high")
+--------------------------------------------------------------------- */
+export interface VersionDescriptor<
+  S extends string = string,
+  D extends string = string,
+> {
+  readonly id: number;                                          // 3-bit header field
+  readonly cipher: new (p: CryptoProvider) => EncryptionAlgorithm;
+  readonly kdf: KeyDerivation<D>;
+
+  readonly saltLengths : Record<S, number>;                     // e.g. { low: 12, high: 16 }
+  readonly difficulties : Record<D, unknown>;                   // free-form KDF presets
+  readonly defaultChunkSize: number;
 }

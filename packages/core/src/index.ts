@@ -4,6 +4,8 @@ import './config/defaults.js';
 
 import type { CryptoProvider } from "./providers/CryptoProvider.js";
 
+import { Difficulty, SaltStrength } from './config/defaults.js';
+
 import { encodeHeader } from "./header/encoder.js";
 import { decodeHeader } from "./header/decoder.js";
 
