@@ -1,21 +1,36 @@
 // packages/core/src/algorithms/kdf/Argon2.ts
-import { KeyDerivation } from '../../types/index.js';
-import { argon2id, Argon2Tuning } from './argon2-wrapper.js';
-import { CryptoProvider } from '../../providers/CryptoProvider.js';
+import type { KeyDerivation } from '../../types/index.js';
+import { argon2id, type Argon2Tuning } from './argon2-wrapper.js';
+import type { CryptoProvider } from '../../providers/CryptoProvider.js';
 
-export class Argon2KDF implements KeyDerivation {
-  constructor(private readonly presets: Record<string, Argon2Tuning>) {}
+/**
+ * Argon2-id Key-Derivation Function
+ */
+export class Argon2KDF implements KeyDerivation<'low' | 'middle' | 'high'> {
+  readonly name = 'argon2id';
+
+  constructor(
+    private readonly presets: Readonly<Record<'low' | 'middle' | 'high', Argon2Tuning>>
+  ) {}
 
   async derive(
-    pass: Uint8Array | string,
+    passphrase: Uint8Array | string,
     salt: Uint8Array,
-    diff: string,
-    p: CryptoProvider,
+    difficulty: 'low' | 'middle' | 'high',
+    provider: CryptoProvider
   ): Promise<CryptoKey> {
-    const { hash } = await argon2id(pass, salt, this.presets[diff], p.isNode ? 'node' : 'browser');
-    return p.subtle.importKey('raw', hash, { name: 'AES-GCM', length: 256 }, false, [
-      'encrypt',
-      'decrypt',
-    ]);
+    const { hash } = await argon2id(
+      passphrase,
+      salt,
+      this.presets[difficulty],
+      provider.isNode ? 'node' : 'browser'
+    );
+    return provider.subtle.importKey(
+      'raw',
+      hash,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt']
+    );
   }
 }

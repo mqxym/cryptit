@@ -1,17 +1,17 @@
 // packages/browser-runtime/src/index.ts
-import { Cryptit, type EncryptionConfig } from "../../core/src/index.js";
-import { browserProvider } from "./provider.js";
+import { Cryptit, type CryptitOptions } from '../../core/src/index.js';
+import { browserProvider } from './provider.js';
 
 /**
- * Factory that mirrors the one in node-runtime, but wired to the
- * browser provider.  Usage in web apps:
- *
- *   import { createCryptit } from "@mqxym/cryptit/browser";
- *   const crypt = createCryptit({ difficulty: "middle" });
+ * Factory for browser environments.  
+ * Usage:
+ *   import { createCryptit } from '@your-org/cryptit/browser';
+ *   const crypt = createCryptit({ difficulty: 'high' });
  */
-export function createCryptit(cfg?: EncryptionConfig): Cryptit {
+export function createCryptit(cfg?: CryptitOptions): Cryptit {
   return new Cryptit(browserProvider, cfg);
 }
 
-/* Re-export the low-level class in case advanced users want it */
-export { Cryptit } from "../../core/src/index.js";
+/** Low-level façade in case advanced users need direct control */
+export { Cryptit } from '../../core/src/index.js';
+export type { CryptitOptions } from '../../core/src/index.js';

@@ -1,24 +1,19 @@
-import type { IEncryptionAlgorithm } from "../types.js";
+// packages/core/src/stream/DecryptTransform.ts
+import type { EncryptionAlgorithm } from '../types/index.js';
 
 /**
  * Counterpart to EncryptTransform.
- * Accepts the framed ciphertext and streams out raw plaintext.
- *
- * Emits Uint8Array chunks identical to the original plaintext
- * (except block boundaries aren’t guaranteed to match).
+ * Streams framed ciphertext → raw plaintext.
  */
 export class DecryptTransform {
   private buffer = new Uint8Array(0);
 
   constructor(
-    private readonly engine: IEncryptionAlgorithm,
+    private readonly engine: EncryptionAlgorithm,
     private readonly chunkSize = 512 * 1024,
   ) {}
 
-  toTransformStream(): TransformStream<
-    Uint8Array | ArrayBuffer | Blob,
-    Uint8Array
-  > {
+  toTransformStream(): TransformStream<Uint8Array | ArrayBuffer | Blob, Uint8Array> {
     return new TransformStream({
       transform: async (chunk, ctl) => {
         await this.transform(
@@ -30,8 +25,6 @@ export class DecryptTransform {
     });
   }
 
-  // --------------------------------------------------------------------------
-
   private async transform(
     bytes: Uint8Array,
     ctl: TransformStreamDefaultController<Uint8Array>,
@@ -42,14 +35,13 @@ export class DecryptTransform {
 
     let offset = 0;
     while (true) {
-      if (combined.length - offset < 4) break; // not enough for header
-
+      if (combined.length - offset < 4) break;
       const cipherLen = new DataView(
         combined.buffer,
         combined.byteOffset + offset,
         4,
       ).getUint32(0, false);
-      if (combined.length - offset - 4 < cipherLen) break; // incomplete
+      if (combined.length - offset - 4 < cipherLen) break;
 
       offset += 4;
       const cipher = combined.slice(offset, offset + cipherLen);
@@ -63,7 +55,7 @@ export class DecryptTransform {
   }
 
   private async flush(ctl: TransformStreamDefaultController<Uint8Array>) {
-    await this.transform(new Uint8Array(0), ctl); // process any tail
+    await this.transform(new Uint8Array(0), ctl);
     this.buffer = new Uint8Array(0);
   }
 

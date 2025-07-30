@@ -1,29 +1,25 @@
 // packages/core/src/stream/StreamProcessor.ts
-import { EncryptTransform }  from "./EncryptTransform.js";
-import { DecryptTransform }  from "./DecryptTransform.js";
-import type { IEncryptionAlgorithm } from "../types.js";
+import { EncryptTransform } from './EncryptTransform.js';
+import { DecryptTransform } from './DecryptTransform.js';
+import type { EncryptionAlgorithm } from '../types/index.js';
 
 export class StreamProcessor {
   constructor(
-    private readonly engine: IEncryptionAlgorithm,
+    private readonly engine: EncryptionAlgorithm,
     private readonly chunkSize = 512 * 1024,
   ) {}
 
-encryptionStream(): TransformStream<Uint8Array, Uint8Array> {
-  const enc = new EncryptTransform(this.engine, this.chunkSize)
-                .toTransformStream();
-  /* return an object that really has BOTH ends */
-  return {
-    writable: enc.writable,
-    readable: enc.readable,
-  } as TransformStream<Uint8Array, Uint8Array>;
-}
-  // ─────────────────────────────────────────────────────────────
-  //  Decrypt: strip header bytes first, then run DecryptTransform
-  // ─────────────────────────────────────────────────────────────
+  encryptionStream(): TransformStream<Uint8Array, Uint8Array> {
+    const enc = new EncryptTransform(this.engine, this.chunkSize)
+                  .toTransformStream();
+    return {
+      writable: enc.writable,
+      readable: enc.readable,
+    } as TransformStream<Uint8Array, Uint8Array>;
+  }
+
   decryptionStream(headerLen: number): TransformStream<Uint8Array, Uint8Array> {
     let skip = headerLen;
-    console.log(skip)
     const strip = new TransformStream<Uint8Array, Uint8Array>({
       transform(chunk, ctl) {
         if (skip === 0) {
@@ -31,7 +27,7 @@ encryptionStream(): TransformStream<Uint8Array, Uint8Array> {
           return;
         }
         if (chunk.byteLength <= skip) {
-          skip -= chunk.byteLength;      // still inside header
+          skip -= chunk.byteLength;
           return;
         }
         ctl.enqueue(chunk.slice(skip));
@@ -39,19 +35,15 @@ encryptionStream(): TransformStream<Uint8Array, Uint8Array> {
       },
     });
 
-    const decrypted = new DecryptTransform(this.engine, this.chunkSize)
-      .toTransformStream();
+    const decryptTs = new DecryptTransform(this.engine, this.chunkSize)
+                        .toTransformStream();
 
     return {
-  writable: strip.writable,
-  readable: strip.readable
-              .pipeThrough(decrypted),
-} as unknown as TransformStream<Uint8Array, Uint8Array>;
+      writable: strip.writable,
+      readable: strip.readable.pipeThrough(decryptTs),
+    } as TransformStream<Uint8Array, Uint8Array>;
   }
 
-  // ─────────────────────────────────────────────────────────────
-  //  Helper that collects a full stream into a single Uint8Array
-  // ─────────────────────────────────────────────────────────────
   async collect(
     readable: ReadableStream<Uint8Array>,
     transform: TransformStream<Uint8Array, Uint8Array>,
