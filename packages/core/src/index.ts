@@ -212,7 +212,7 @@ export class Cryptit {
       this.log.log(2, 'Deriving key for text encryption');
       const salt = this.genSalt();
       await this.deriveKey(pass, salt);
-      this.log.log(3, `Salt generated: ${base64Encode(salt)}, difficulty: ${this.difficulty}`);
+      this.log.log(3, `Salt generated: ${base64Encode(salt)}, KDF difficulty: ${this.difficulty}`);
 
       this.log.log(2, 'Encrypting text data');
       const cipher = await this.cipher.encryptChunk(
@@ -246,6 +246,7 @@ export class Cryptit {
       this.log.log(3, 'Trying to get engine');
       const engine = EngineManager.getEngine(this.provider, hdr.version);
       this.log.log(2, 'Deriving key via engine for text decryption');
+      this.log.log(3, `Salt use: ${base64Encode(hdr.salt)}, KDF difficulty: ${hdr.difficulty}`);
       await EngineManager.deriveKey(engine, pass, hdr.salt, hdr.difficulty);
 
       this.log.log(2, 'Decrypting text data');
