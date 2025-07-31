@@ -84,7 +84,7 @@ await createReadStream("movie.enc")
 ```ts
 const c = createCryptit({ verbose: 1 });
 
-// convenience 🔒/🔓
+// text
 await c.encryptText("txt", pass);
 await c.decryptText(b64,  pass);
 
