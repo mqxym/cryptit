@@ -65,8 +65,6 @@ export interface CryptitOptions {
   verbose?      : Verbosity;
   /** Optional custom logger callback (receives formatted messages) */
   logger?       : (msg: string) => void;
-  /** Override salt length in bytes (advanced use) */
-  saltLength?   : number;
 }
 
 /**
@@ -82,7 +80,6 @@ export class Cryptit {
 
   private difficulty   : Difficulty;
   private saltStrength : SaltStrength;
-  private customSaltLen: number | null;
 
   private readonly engines = new Map<number, Engine>();
 
@@ -106,7 +103,6 @@ export class Cryptit {
 
     this.difficulty     = opt.difficulty   ?? 'middle';
     this.saltStrength   = opt.saltStrength ?? 'high';
-    this.customSaltLen  = opt.saltLength   ?? null;
 
     this.log = createLogger(opt.verbose ?? 0, opt.logger);
   }
@@ -174,10 +170,10 @@ export class Cryptit {
    * Override salt length (in bytes) for new operations (advanced use).
    * @param len - Custom salt length in bytes
    */
-  setSaltLength(len: number): void           { this.customSaltLen = len; }
+  setSaltDifficulty(d: SaltStrength): void           { this.saltStrength = d; }
   /** Get the effective salt length for the current strength. */
-  getSaltLength(): number {
-    return this.customSaltLen ?? this.v.saltLengths[this.saltStrength];
+  getSaltDifficulty(): SaltStrength {
+    return this.saltStrength;
   }
 
   /**
@@ -456,7 +452,7 @@ export class Cryptit {
 
   /** Generate a secure random salt according to configured length. */
   private genSalt(): Uint8Array {
-    const len = this.customSaltLen ?? this.v.saltLengths[this.saltStrength];
+    const len = this.v.saltLengths[this.saltStrength];
     return this.provider.getRandomValues(new Uint8Array(len));
   }
 

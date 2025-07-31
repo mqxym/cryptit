@@ -91,7 +91,7 @@ await c.decryptText(b64,  pass);
 // runtime tweaks
 c.setDifficulty("high");
 c.setVersion(2);           // choose another registered format
-c.setSaltLength(32);
+c.setSaltDifficulty("low");
 
 // helpers
 Cryptit.isEncrypted(blobOrB64);          // ↦ boolean
@@ -131,7 +131,7 @@ cat movie.enc | cryptit decode
 | ------------------------- | ------- | -------------------- |
 | `-p, --pass <pw>`         | prompt  | passphrase           |
 | `-d, --difficulty <l>`    | middle  | Argon2 preset        |
-| `-s, --salt-strength <l>` | high    | 8 B vs 16 B salt     |
+| `-s, --salt-strength <l>` | high    | 12 B vs 16 B salt    |
 | `-c, --chunk-size <n>`    | 524 288 | plaintext block size |
 | `-v, --verbose`           |  0 … 4  | repeat to increase   |
 
