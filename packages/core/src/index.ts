@@ -242,6 +242,7 @@ export class Cryptit {
       this.log.log(1, 'Start text decryption');
       const data   = base64Decode(b64);
       this.log.log(3, 'Start header decoding');
+      await Cryptit.peekHeader(b64);
       const hdr    = decodeHeader(data);
       this.log.log(3, 'Trying to get engine');
       const engine = EngineManager.getEngine(this.provider, hdr.version);
@@ -478,7 +479,7 @@ export class Cryptit {
   ): Promise<Uint8Array> {
     // Handle Base64 text input
     if (typeof input === 'string') {
-      return base64Decode(input);
+      input = base64Decode(input);
     }
 
     // Handle raw Uint8Array input
@@ -494,7 +495,7 @@ export class Cryptit {
     // Handle Blob/File input
     if (input instanceof Blob) {
       const first2 = new Uint8Array(await input.slice(0, 2).arrayBuffer());
-      if (first2[0] !== 0x01) throw new InvalidHeaderError('Bad magic byte');
+      if (first2[0] !== 0x01) throw new InvalidHeaderError('Invalid input format. The input is unknown.');
 
       const info        = first2[1];
       const version     = info >> 5;
