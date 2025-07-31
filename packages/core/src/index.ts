@@ -29,6 +29,7 @@ import {
   KeyDerivationError,
   InvalidHeaderError,
   HeaderDecodeError,
+  DecodingError,
 } from './errors/index.js';
 
 import { EngineManager, type Engine } from './engine/EngineManager.js';
@@ -262,6 +263,7 @@ export class Cryptit {
         err instanceof DecryptionError   ||
         err instanceof InvalidHeaderError||
         err instanceof HeaderDecodeError ||
+        err instanceof DecodingError ||
         err instanceof KeyDerivationError
       ) throw err;
 

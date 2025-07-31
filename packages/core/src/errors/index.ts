@@ -12,6 +12,8 @@ export class CryptitError extends Error {
 }
 
 export class InvalidHeaderError   extends CryptitError {}
+export class DecodingError        extends CryptitError {}
+export class EncodingError        extends CryptitError {}
 export class VersionError         extends CryptitError {}
 export class HeaderDecodeError    extends CryptitError {}
 export class KeyDerivationError   extends CryptitError {}

@@ -126,6 +126,7 @@
         const crypt = getCryptitInstance();
         outputEl.value = await crypt.encryptText(inputEl.value, pass);
       } catch (e) {
+        const name = e.constructor.name;
         showError(e.message ?? String(e));
       }
     }
@@ -139,6 +140,7 @@
         const crypt = getCryptitInstance();
         outputEl.value = await crypt.decryptText(inputEl.value.trim(), pass);
       } catch (e) {
+        const name = e.constructor.name;
         showError(e.message ?? String(e));
       }
     });

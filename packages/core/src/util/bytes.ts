@@ -1,3 +1,5 @@
+import { EncodingError, DecodingError } from "../errors/index.js";
+
 /**
  * Tiny run-time test – are we really in Node/Bun, **not** a browser bundle
  * that merely polyfilled `Buffer`?
@@ -26,27 +28,39 @@ export function concat(...chunks: Uint8Array[]): Uint8Array {
 
 /* ----------  Base64 encode  --------------------------------------- */
 export function base64Encode(...chunks: Uint8Array[]): string {
-  const data = concat(...chunks);
+  try {
+    const data = concat(...chunks);
 
-  if (isNodeLike()) {
-    // genuine Node / Bun
-    return (Buffer as any).from(data).toString('base64');
+    if (isNodeLike()) {
+      // genuine Node / Bun
+      return (Buffer as any).from(data).toString('base64');
+    }
+
+    // Browser (skip any injected Buffer polyfill)
+    let binary = '';
+    for (let i = 0; i < data.length; i++) binary += String.fromCharCode(data[i]);
+    return btoa(binary);
+  } catch (err: any) {
+    const msg = "Base64 Enconding Error";
+    throw new EncodingError(msg);
   }
-
-  // Browser (skip any injected Buffer polyfill)
-  let binary = '';
-  for (let i = 0; i < data.length; i++) binary += String.fromCharCode(data[i]);
-  return btoa(binary);
+  
 }
 
 /* ----------  Base64 decode  --------------------------------------- */
 export function base64Decode(b64: string): Uint8Array {
-  if (isNodeLike()) {
-    return new Uint8Array((Buffer as any).from(b64, 'base64'));
-  }
+  try {
+    if (isNodeLike()) {
+      return new Uint8Array((Buffer as any).from(b64, 'base64'));
+    }
 
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
+    const bin = atob(b64);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  } catch (err: any) {
+    const msg = "Base64 Decoding Error";
+    throw new DecodingError(msg);
+  }
+  
 }
