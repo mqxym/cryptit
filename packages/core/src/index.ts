@@ -208,6 +208,7 @@ export class Cryptit {
    */
   async encryptText(plain: string | Uint8Array, pass: string): Promise<string> {
     try {
+      this.log.log(1, 'Start text encryption');
       this.log.log(2, 'Deriving key for text encryption');
       const salt = this.genSalt();
       await this.deriveKey(pass, salt);
@@ -217,8 +218,9 @@ export class Cryptit {
       const cipher = await this.cipher.encryptChunk(
         typeof plain === 'string' ? new TextEncoder().encode(plain) : plain,
       );
-
+      this.log.log(3, 'Encoding header');
       const header = encodeHeader(this.v.id, this.difficulty, this.saltStrength, salt);
+      this.log.log(3, 'Encoding text');
       return base64Encode(header, cipher);
 
     } catch (err) {
@@ -237,15 +239,20 @@ export class Cryptit {
    */
   async decryptText(b64: string, pass: string): Promise<string> {
     try {
+      this.log.log(1, 'Start text decryption');
       const data   = base64Decode(b64);
+      this.log.log(3, 'Start header decoding');
       const hdr    = decodeHeader(data);
+      this.log.log(3, 'Trying to get engine');
       const engine = EngineManager.getEngine(this.provider, hdr.version);
+      this.log.log(2, 'Deriving key via engine for text decryption');
       await EngineManager.deriveKey(engine, pass, hdr.salt, hdr.difficulty);
 
       this.log.log(2, 'Decrypting text data');
       const plainBytes = await engine.cipher.decryptChunk(
         data.slice(hdr.headerLen),
       );
+      this.log.log(3, 'Decoding text');
       return new TextDecoder().decode(plainBytes);
 
     } catch (err) {
