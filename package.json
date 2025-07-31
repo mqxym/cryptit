@@ -1,6 +1,6 @@
 {
     "name": "@mqxym/cryptit",
-    "version": "0.2.1",
+    "version": "0.2.2",
     "type": "module",
     "workspaces": [
         "packages/*"
@@ -20,7 +20,8 @@
     "dependencies": {
         "argon2": "^0.43.1",
         "argon2-browser": "^1.18.0",
-        "commander": "^11.0.1"
+        "commander": "^11.0.1",
+        "tslib": "^2.8.1"
     },
     "devDependencies": {
         "@types/jest": "^30.0.0",
@@ -28,23 +29,22 @@
         "eslint": "^8.57.0",
         "typescript": "^5.5.0"
     },
-
-  "exports": {
-    ".": {
-      "import": "./dist/cryptit.index.mjs/index.js",
-      "require": "./dist/cryptit.index.cjs/index.js"
+    "exports": {
+        ".": {
+            "import": "./dist/cryptit.index.mjs/index.js",
+            "require": "./dist/cryptit.index.cjs/index.js"
+        },
+        "./browser": {
+            "import": "./dist/cryptit.browser.min.js/index.js",
+            "require": "./dist/cryptit.browser.min.js/index.js"
+        },
+        "./cli": {
+            "import": "./dist/cryptit.cli.mjs/cli.js",
+            "require": "./dist/cryptit.cli.cjs/cli.js"
+        },
+        "./*.wasm": "./dist/*.wasm"
     },
-    "./browser": {
-      "import": "./dist/cryptit.browser.min.js/index.js",
-      "require": "./dist/cryptit.browser.min.js/index.js"
-    },
-    "./cli": {
-      "import": "./dist/cryptit.cli.mjs/cli.js",
-      "require": "./dist/cryptit.cli.cjs/cli.js"
-    },
-    "./*.wasm": "./dist/*.wasm"
-  },
-  "bin": {
-    "cryptit": "./dist/bin/cryptit"
-  }
+    "bin": {
+        "cryptit": "./dist/bin/cryptit"
+    }
 }

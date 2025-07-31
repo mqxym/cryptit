@@ -1,40 +1,40 @@
 # @mqxym/cryptit
 
-Modern, cross-platform AES-GCM + Argon2-id encryption for files **and** text.
+Modern, cross‑platform **AES‑GCM 256 + Argon2‑id** encryption for both **files** *and* **text**.
 
-* **Node 18+ / Bun 1+** – uses the native `argon2` addon & WebCrypto
-* **Browser (evergreen)** – loads the tiny `argon2-browser` WASM module
-* **CLI** – stream-encrypt large files without loading them in memory
-* **TypeScript-first**, tree-shakable, ESM & CommonJS builds.
+* **Node 18 / Bun 1** – native `argon2` addon + WebCrypto
+* **Browser (evergreen)** – tiny WASM build of `argon2-browser`
+* **CLI** – stream encryption & decryption, zero memory bloat
+* **TypeScript‑first**, tree‑shakable, ESM & CJS builds
+* **Format‑agnostic decryption** – one instance reads any registered version
 
 ---
 
 ## Install
 
 ```bash
-# with Bun (recommended)
+# Bun (recommended)
 bun add @mqxym/cryptit
 
-# …or with npm / pnpm
-npm i @mqxym/cryptit
+# npm / pnpm
+yarn add @mqxym/cryptit           # or npm i / pnpm add
 ```
 
 ---
 
-## Quick start (Node / Bun)
+## Quick start – Node / Bun
 
 ```ts
 import { createCryptit } from "@mqxym/cryptit";
 
 const crypt = createCryptit({ difficulty: "middle" });
-const passphrase = "correct horse battery staple";
+const pass  = "correct horse battery staple";
 
-const cipherB64 = await crypt.encryptText("hello world", passphrase);
-const plainTxt  = await crypt.decryptText(cipherB64, passphrase);
-console.log(plainTxt); // → "hello world"
+const b64 = await crypt.encryptText("hello", pass);
+console.log(await crypt.decryptText(b64, pass)); // → "hello"
 ```
 
-### Encrypt / decrypt a file (streaming)
+### Streaming files
 
 ```ts
 import { createCryptit } from "@mqxym/cryptit";
@@ -43,134 +43,124 @@ import { createReadStream, createWriteStream } from "node:fs";
 const crypt = createCryptit();
 const pass  = "hunter2";
 
-const rs = createReadStream("movie.mkv");
-const ws = createWriteStream("movie.enc");
-
-await rs
+// encrypt → movie.enc
+await createReadStream("movie.mkv")
   .pipeThrough(await crypt.createEncryptionStream(pass))
-  .pipeTo(ws);
+  .pipeTo(createWriteStream("movie.enc"));
 
-// ——— later ———
-const drs = createReadStream("movie.enc");
-const dws = createWriteStream("movie.mkv");
-
-await drs
+// decrypt back
+await createReadStream("movie.enc")
   .pipeThrough(await crypt.createDecryptionStream(pass))
-  .pipeTo(dws);
+  .pipeTo(createWriteStream("movie.mkv"));
 ```
 
 ---
 
 ## Browser usage
 
-### Bundle with Vite / Webpack / esbuild
-
-```ts
-// app.ts
-import { createCryptit } from "@mqxym/cryptit/browser";
-
-const crypt = createCryptit({ saltStrength: "high" });
-
-input.addEventListener("change", async (e) => {
-  const file  = (e.target as HTMLInputElement).files![0];
-  const blob  = await crypt.encryptFile(file, "mypw");
-  downloadBlob(blob, file.name + ".enc");
-});
-```
-
-> The `argon2-browser` WASM file is fetched lazily.
-> Host it yourself:
->
-> ```ts
-> import * as a2 from "argon2-browser";
-> a2.wasmURL = "/static/argon2.wasm";
-> ```
-
-### Script-tag fallback
-
 ```html
-<script src="https://unpkg.com/@mqxym/cryptit/dist/browser.min.js"></script>
-<script>
-  const crypt = Cryptit.createCryptit();
-  crypt.encryptText("hi", "pw").then(console.log);
+<!-- app.ts / app.js -->
+<script type="module">
+  import { createCryptit } from "@mqxym/cryptit/browser";
+
+  // IMPORTANT: host argon2.wasm at /dist/argon2.wasm (relative to final HTML)
+
+  const crypt = createCryptit({ saltStrength: "high", verbose: 2 });
+
+  async function enc() {
+    const cipher = await crypt.encryptText("hello", "pw");
+    console.log(cipher);
+  }
+  enc();
 </script>
 ```
 
----
-
-## CLI
-
-```bash
-# one-off use
-bunx @mqxym/cryptit encrypt notes.txt -o notes.enc -p "pw"
-
-# or install globally
-bun add -g @mqxym/cryptit          # -> `cryptit` in $PATH
-
-# encrypt file
-cat photo.jpg | cryptit encrypt - -p hunter2 > photo.enc
-
-# decrypt
-cryptit decrypt photo.enc -p hunter2 -o photo.jpg
-
-# encrypt text
-echo "secret" | cryptit encrypt-text -p pw
-```
-
-| Flag                       | Default  | Notes                                 |
-| -------------------------- | -------- | ------------------------------------- |
-| `-p, --pass`               | *prompt* | passphrase (hidden prompt if omitted) |
-| `-d, --difficulty`         | middle   | Argon2 preset: `low / middle / high`  |
-| `-s, --salt-strength`      | high     | `low` (8 B) or `high` (16 B) salt     |
-| `-c, --chunk-size <bytes>` | 524288   | size of plaintext blocks              |
-| `-v, -vv, …`               | 0        | increase verbosity                    |
-
-Exit codes: **0** ok · **10** auth failure · **11** invalid header · **≥20** other error
+*Use with a bundler or simply via `<script type="module">`.*
 
 ---
 
-## API surface
+## API highlights
 
 ```ts
-createCryptit(cfg?: EncryptionConfig) → Cryptit
+const c = createCryptit({ verbose: 1 });
 
-interface EncryptionConfig {
-  difficulty?: "low" | "middle" | "high"
-  saltStrength?: "low" | "high"
-  chunkSize?: number               // default 512 KiB
-}
+// convenience 🔒/🔓
+await c.encryptText("txt", pass);
+await c.decryptText(b64,  pass);
 
-class Cryptit {
-  encryptText(plain, pass): Promise<string>
-  decryptText(b64, pass): Promise<string>
+// runtime tweaks
+c.setDifficulty("high");
+c.setVersion(2);           // choose another registered format
+c.setSaltLength(32);
 
-  encryptFile(file: Blob, pass): Promise<Blob>
-  decryptFile(file: Blob, pass): Promise<Blob>
-
-  createEncryptionStream(pass): Promise<TransformStream>
-  createDecryptionStream(pass): Promise<TransformStream>
-}
+// helpers
+Cryptit.isEncrypted(blobOrB64);          // ↦ boolean
+Cryptit.headerDecode(blobOrB64);         // ↦ meta {version, salt, …}
 ```
+
+Verbose levels:
+
+| Level | Emits                         |
+| ----- | ----------------------------- |
+| 0     | errors only                   |
+| 1     | +start/finish notices         |
+| 2     | +timings, key‑derivation info |
+| 3     | +salt / version / KDF details |
+| 4     | wire‑level debug              |
 
 ---
 
-## Building from source
+## CLI (`cryptit`)
+
+```bash
+# encrypt file → .enc | decrypt back
+encrypt: cryptit encrypt  <in> [-o out] [options]
+decrypt: cryptit decrypt  <in> [-o out] [options]
+
+encrypt text  : echo "secret" | cryptit encrypt-text  -p pw
+decrypt text  : echo "…b64…" | cryptit decrypt-text -p pw
+
+# inspect header (no decryption)
+cryptit decode movie.enc
+cat movie.enc | cryptit decode
+```
+
+### Common flags
+
+| Flag                      | Default | Description          |
+| ------------------------- | ------- | -------------------- |
+| `-p, --pass <pw>`         | prompt  | passphrase           |
+| `-d, --difficulty <l>`    | middle  | Argon2 preset        |
+| `-s, --salt-strength <l>` | high    | 8 B vs 16 B salt     |
+| `-c, --chunk-size <n>`    | 524 288 | plaintext block size |
+| `-v, --verbose`           |  0 … 4  | repeat to increase   |
+
+Exit codes: **0** success · **1** any failure (invalid header, auth, I/O …)
+
+---
+
+## Versioned format
+
+* Header: `0x01 | infoByte | salt`
+* Decryptors pick the engine by the header’s version ⇒ **one CLI handles all registered versions**.
+
+---
+
+## Build from source
 
 ```bash
 git clone https://github.com/mqxym/cryptit
 cd cryptit
-bun install
-bun run build           # emits dist/ + native CLI binary
-bun test                # Bun test runner with coverage
+bun install && bun run build && bun test
 ```
 
 ---
 
-## Security notes
+## Security
 
-* AES-GCM 256 with 12-byte IV, 128-bit tag
-* Argon2-id defaults: `middle` = `t=3`, `memory=64 MiB`
-* Keys derived & held in-memory only; secrets zeroed where possible
+* AES‑GCM 256 / 12‑byte IV / 128‑bit tag
+* Argon2‑id presets (low / middle / high)
+* Salts generated per‑ciphertext; never reused
 
 ---
 

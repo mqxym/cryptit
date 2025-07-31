@@ -1,5 +1,5 @@
 import { $ } from "bun";
-import { resolve } from "node:path";
+import { resolve, join, dirname } from 'node:path';
 
 const outdir = "dist";
 
@@ -16,6 +16,7 @@ await runBuild(
   entryNode,
   "--minify",
   "--format=esm",
+  "--external:argon2-browser",
   "--target=node",
   `--asset-naming=cryptit.index.[ext]`,
   "--sourcemap=external",
@@ -28,21 +29,9 @@ await runBuild(
   "--format=cjs",
   "--target=node",
   "--sourcemap=external",
+  "--external:argon2-browser",
   `--asset-naming=cryptit.index.[ext]`,
   `--outdir=${resolve(outdir, "cryptit.index.cjs")}`
-);
-
-await runBuild(
-  entryBrowser,
-  "--minify",
-  "--target=browser",
-  "--format=esm",
-  "--sourcemap=external",
-  "--external:commander",
-  "--external:argon2",
-  "--scope-hoist",
-  `--asset-naming=cryptit.browser.min.[ext]`,
-  `--outdir=${resolve(outdir, "cryptit.browser.min.js")}`
 );
 
 await runBuild(
@@ -50,6 +39,7 @@ await runBuild(
   "--minify",
   "--format=cjs",
   "--target=node",
+  "--external:argon2-browser",
   "--sourcemap=external",
   `--outdir=${resolve(outdir, "cryptit.cli.cjs")}`,
   `--asset-naming=cryptit.cli.[ext]`
@@ -60,6 +50,7 @@ await runBuild(
   "--minify",
   "--format=esm",
   "--target=node",
+  "--external:argon2-browser",
   "--sourcemap=external",
   `--outdir=${resolve(outdir, "cryptit.cli.mjs")}`,
   `--asset-naming=cryptit.cli.[ext]`
@@ -68,9 +59,42 @@ await runBuild(
 await runBuild(
   entryCLI,
   "--compile",
+  "--external:argon2-browser",
   `--outfile=${resolve(outdir, "bin", "cryptit")}`
+);
+
+await runBuild(
+  [entryBrowser],
+  "--minify",
+  "--target=browser",
+  "--format=esm",
+  "--sourcemap=external",
+  "--external:commander",
+  "--external:buffer",                      
+  "--external:process",
+  `--asset-naming=cryptit.browser.min.[ext]`,
+  `--outdir=${resolve(outdir, "cryptit.browser.min.js")}`
 );
 
 async function runBuild(entryFile, ...flags) {
   await $`bun build ${entryFile} ${flags}`;
 }
+
+import { copyFileSync } from 'node:fs';
+
+const outDir = resolve(__dirname, 'dist', 'cryptit.browser.min.js');
+
+const srcWasm = join(outDir, 'cryptit.browser.min.wasm');
+const dstWasm = join(outDir, 'argon2.wasm');
+const dstWasm2 = join('examples', 'dist', 'argon2.wasm')
+
+copyFileSync(srcWasm, dstWasm);
+copyFileSync(srcWasm, dstWasm2);
+
+await $`rm -rf ${join(outDir, 'cryptit.browser.min.wasm')}`;
+await $`rm -rf ${join(outdir, 'cryptit.cli.cjs', 'cryptit.cli.wasm')}`;
+await $`rm -rf ${join(outdir, 'cryptit.cli.mjs', 'cryptit.cli.wasm')}`;
+await $`rm -rf ${join(outdir, 'cryptit.index.mjs', 'cryptit.index.wasm')}`;
+await $`rm -rf ${join(outdir, 'cryptit.index.cjs', 'cryptit.index.wasm')}`;
+
+

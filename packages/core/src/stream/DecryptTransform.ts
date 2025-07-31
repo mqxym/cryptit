@@ -1,5 +1,6 @@
 // packages/core/src/stream/DecryptTransform.ts
 import type { EncryptionAlgorithm } from '../types/index.js';
+import { DecryptionError } from '../errors/index.js';
 
 /**
  * Counterpart to EncryptTransform.
@@ -47,8 +48,16 @@ export class DecryptTransform {
       const cipher = combined.slice(offset, offset + cipherLen);
       offset += cipherLen;
 
-      const plain = await this.engine.decryptChunk(cipher);
-      ctl.enqueue(plain);
+      try {
+        const plain = await this.engine.decryptChunk(cipher);
+        ctl.enqueue(plain);
+      } catch (err) {
+        throw err instanceof DecryptionError
+          ? err
+         : new DecryptionError(
+              'Decryption failed: Wrong passphrase or corrupted ciphertext',
+            );
+      }
     }
 
     this.buffer = combined.slice(offset);

@@ -7,6 +7,8 @@
 
 import * as Argon2Browser from "argon2-browser";
 
+import { KeyDerivationError } from "../../errors/index.js";
+
 /** Minimal subset of tuning parameters we expose */
 export interface Argon2Tuning {
   time: number;        // iterations
@@ -16,6 +18,14 @@ export interface Argon2Tuning {
 
 export type ArgonHash = { hash: Uint8Array };
 
+type Argon2HashResult = {
+  // raw bytes of the derived key
+  hash: Uint8Array;
+  // hex-encoded string of the derived key
+  hashHex: string;
+  // the full Argon2 encoded string (salt, params, hash)
+  encoded: string;
+};
 /**
  * Derive a 32-byte hash with Argon2-id.
  *
@@ -54,18 +64,49 @@ export async function argon2id(
   }
 
   // ————————————————————————————  Browser  ————————————————————————————
-  if (env === "browser") {
-    const { hash } = await Argon2Browser.hash({
-      pass: password,
-      salt,
-      time: opts.time,
-      mem: opts.mem,
-      parallelism: opts.parallelism,
-      hashLen: 32,
-      type: Argon2Browser.ArgonType.Argon2id,
-    });
-    return { hash };
+if (env === "browser") {
+  
+  if (!('loadArgon2WasmBinary' in globalThis)) {
+    (globalThis as any).loadArgon2WasmBinary = () => {
+      const url = new URL('argon2.wasm', import.meta.url).href;
+      return fetch(url)
+        .then(res => {
+          if (!res.ok) {
+            throw new Error('Failed to load argon2.wasm');
+          }
+          return res.arrayBuffer();
+        })
+        .then(buf => new Uint8Array(buf));
+    };
   }
+
+ return Argon2Browser.hash({
+    pass        : password,
+    salt        : salt,
+    time        : opts.time,
+    mem         : opts.mem,
+    parallelism : opts.parallelism,
+    hashLen     : 32,
+    type        : Argon2Browser.ArgonType.Argon2id,
+  })
+  .then((result: Argon2HashResult) => {
+    if (!result || !result.hash) {
+      throw new Error('Failed to produce key derivation');
+    }
+    return { hash: result.hash };
+  })
+  .catch((error: unknown) => {
+    // Narrow the error to extract a message
+    const message =
+      error instanceof Error
+        ? error.message
+        : typeof error === 'string'
+        ? error
+        : 'Unknown error';
+
+    throw new KeyDerivationError(`argon2-browser failure: ${message}`);
+  });
+}
 
   throw new Error(`Unsupported environment: ${env}`);
 }
