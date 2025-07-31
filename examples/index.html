@@ -118,11 +118,12 @@
     });
 
     async function encrypt () {
-        const crypt = getCryptitInstance();
+        
         const pass  = secretEl.value;
         if (!pass) { showError('Passphrase is required'); return; }
 
       try {
+        const crypt = getCryptitInstance();
         outputEl.value = await crypt.encryptText(inputEl.value, pass);
       } catch (e) {
         showError(e.message ?? String(e));
@@ -131,11 +132,11 @@
 
     document.getElementById('decryptBtn').addEventListener('click', async () => {
       clearError();
-      const crypt = getCryptitInstance();
       const pass  = secretEl.value;
       if (!pass) { showError('Passphrase is required'); return; }
 
       try {
+        const crypt = getCryptitInstance();
         outputEl.value = await crypt.decryptText(inputEl.value.trim(), pass);
       } catch (e) {
         showError(e.message ?? String(e));
