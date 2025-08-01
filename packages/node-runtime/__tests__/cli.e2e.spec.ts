@@ -36,35 +36,34 @@ describe('cryptit (CLI)', () => {
     expect(dec.stdout).toBe('hello');
   });
 
-    it('decode detects header meta-data', async () => {
-        const { stdout: cipher } = await run(['encrypt-text', 'a', '--pass', 'p']);
+  it('decode detects header meta-data', async () => {
+      const { stdout: cipher } = await run(['encrypt-text', 'a', '--pass', 'p']);
 
-        const { stdout } = await run(['decode', '-'], cipher.trim());
+      const { stdout } = await run(['decode', '-'], cipher.trim());
 
-        const meta = JSON.parse(stdout);
-        expect(meta).toMatchObject({
-            version: 0,
-            difficulty: 'middle',
-        });
-    });
+      const meta = JSON.parse(stdout);
+      expect(meta).toMatchObject({
+          version: 0,
+          difficulty: 'middle',
+      });
+  });
 
-    it('fails cleanly on wrong password', async () => {.
-        const { stdout: cipher } = await run(['encrypt-text', 'x', '--pass', 'good']);
-                                                    */
-        const child = run(['decrypt-text', '--pass', 'bad'], cipher.trim());
+  it('fails cleanly on wrong password', async () => {
+    const { stdout: cipher } = await run(['encrypt-text', 'x', '--pass', 'good']);
+    const child = run(['decrypt-text', '--pass', 'bad'], cipher.trim());
 
 
-        await child.then(
-            proc => {
-            // Bun path: promise fulfilled but exitCode = 1
-            expect(proc.exitCode).not.toBe(0);
-            expect(proc.stderr).toMatch(/Error \[DecryptionError]/);
-            },
-            err => {
-            // Node path: promise rejected with ExecaError
-            expect(err.stderr).toMatch(/Error \[DecryptionError]/);
-            },
-        );
-    });
+    await child.then(
+        proc => {
+        // Bun path: promise fulfilled but exitCode = 1
+        expect(proc.exitCode).not.toBe(0);
+        expect(proc.stderr).toMatch(/Error \[DecryptionError]/);
+        },
+        err => {
+        // Node path: promise rejected with ExecaError
+        expect(err.stderr).toMatch(/Error \[DecryptionError]/);
+        },
+    );
+  });
     
 });
