@@ -10,7 +10,7 @@ import { createCryptit } from './index.js';
 import { VersionRegistry } from '../../core/src/config/VersionRegistry.js';
 import { Cryptit } from '../../core/src/index.js';
 
-const PKG_VERSION = '0.2.4'; // sync with root package.json
+const PKG_VERSION = '0.2.5'; // sync with root package.json
 
 async function promptPass(): Promise<string> {
   if (!stdin.isTTY) throw new Error('STDIN not a TTY; use --pass');
@@ -96,6 +96,18 @@ program
         return n;
       })
       .default(512 * 1024, '512*1024')
+  )
+
+  .addOption(
+    new Option('--scheme <0-1>', 'encryption scheme version')
+      .argParser((v) => {
+        const n = Number(v);
+        if (!Number.isInteger(n) || n < 0 || n > 7) {
+          throw new Error('Version size must be a integer between 0 and 7');
+        }
+        return n;
+      })
+      .default(0, '0')
   )
 
   // verbosity (repeatable)
@@ -209,6 +221,7 @@ program
       saltStrength: opts.saltStrength,
       chunkSize: opts.chunkSize,
       verbose: opts.verbose,
+      version: opts.scheme,
     });
     const pass =
       opts.pass ??
@@ -258,6 +271,7 @@ program
       saltStrength: opts.saltStrength,
       chunkSize: opts.chunkSize,
       verbose: opts.verbose,
+      version: opts.scheme,
     });
     
     const outPath = cmd.out;
@@ -289,6 +303,7 @@ program
       difficulty: opts.difficulty,
       saltStrength: opts.saltStrength,
       verbose: opts.verbose,
+      version: opts.scheme,
     });
     const pass =
       opts.pass ??
@@ -310,6 +325,7 @@ program
       difficulty: opts.difficulty,
       saltStrength: opts.saltStrength,
       verbose: opts.verbose,
+      version: opts.scheme,
     });
     const pass = opts.pass ?? await promptPass();
     const data = b64 ?? (await readAllFromStdin()).trim();

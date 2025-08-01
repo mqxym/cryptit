@@ -19,3 +19,7 @@ export function createLogger(
     },
   };
 }
+/*
+const loggerSingleton: Logger = createLogger();
+
+export default loggerSingleton;*/

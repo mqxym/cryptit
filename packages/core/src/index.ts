@@ -209,7 +209,7 @@ export class Cryptit {
    */
   async encryptText(plain: string | Uint8Array, pass: string): Promise<string> {
     try {
-      this.log.log(1, 'Start text encryption');
+      this.log.log(1, `Start text encryption, Version ${this.getVersion()}`);
       this.log.log(2, 'Deriving key for text encryption');
       const salt = this.genSalt();
       await this.deriveKey(pass, salt);
@@ -242,7 +242,7 @@ export class Cryptit {
    */
   async decryptText(b64: string, pass: string): Promise<string> {
     try {
-      this.log.log(1, 'Start text decryption');
+      this.log.log(1, `Start text decryption, Version ${this.getVersion()}`);
       this.log.log(3, 'Start text decoding');
       const data   = base64Decode(b64);
       this.log.log(3, 'Start header decoding');
@@ -458,7 +458,7 @@ export class Cryptit {
     const start = performance.now();
     try {
       const key = await this.kdf.derive(pass, salt, diff, this.provider);
-      (this.cipher as any).key = key;
+      (this.cipher as any).setKey(key);
       this.log.log(3, `Key derivation completed in ${(performance.now() - start).toFixed(1)} ms`);
     } catch (err) {
       throw new KeyDerivationError(

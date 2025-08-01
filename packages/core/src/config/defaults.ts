@@ -1,5 +1,6 @@
 import { VersionRegistry } from './VersionRegistry.js';
 import { AESGCM } from '../algorithms/encryption/aes-gmc/AESGCM.js';
+import { XChaCha20Poly1305 } from '../algorithms/encryption/xchacha20poly1305/XChaCha20-Poly1305.js';
 import { Argon2KDF } from '../algorithms/kdf/Argon2.js';
 import { VersionDescriptor } from '../types/index.js';
 
@@ -18,7 +19,17 @@ const v0: VersionDescriptor = {
   defaultChunkSize: 512 * 1024,
 };
 
+const v1: VersionDescriptor = {
+  id: 1,
+  cipher: XChaCha20Poly1305,
+  kdf: new Argon2KDF(DEFAULT_DIFFICULTIES, true),
+  saltLengths: { low: 12, high: 16 },
+  difficulties: DEFAULT_DIFFICULTIES,
+  defaultChunkSize: 512 * 1024,
+};
+
 VersionRegistry.register(v0);
+VersionRegistry.register(v1);
 
 export type SaltStrength = 'low' | 'high';
 export type Difficulty = keyof typeof DEFAULT_DIFFICULTIES;

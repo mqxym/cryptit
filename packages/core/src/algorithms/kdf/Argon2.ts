@@ -10,14 +10,15 @@ export class Argon2KDF implements KeyDerivation<'low' | 'middle' | 'high'> {
   readonly name = 'argon2id';
 
   constructor(
-    private readonly presets: Readonly<Record<'low' | 'middle' | 'high', Argon2Tuning>>
+    private readonly presets: Readonly<Record<'low' | 'middle' | 'high', Argon2Tuning>>,
+    private exportExtractable: Boolean = false
   ) {}
 
   async derive(
     passphrase: Uint8Array | string,
     salt: Uint8Array,
     difficulty: 'low' | 'middle' | 'high',
-    provider: CryptoProvider
+    provider: CryptoProvider,
   ): Promise<CryptoKey> {
     const { hash } = await argon2id(
       passphrase,
@@ -25,12 +26,22 @@ export class Argon2KDF implements KeyDerivation<'low' | 'middle' | 'high'> {
       this.presets[difficulty],
       provider.isNode ? 'node' : 'browser'
     );
-    return provider.subtle.importKey(
-      'raw',
-      hash,
-      { name: 'AES-GCM', length: 256 },
-      false,
-      ['encrypt', 'decrypt']
-    );
+    if (this.exportExtractable) {
+      return provider.subtle.importKey(
+        'raw',
+        hash,
+        { name: 'AES-GCM', length: 256 },
+        true,
+        ['encrypt', 'decrypt']
+      );
+    } else {
+      return provider.subtle.importKey(
+        'raw',
+        hash,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt']
+      );
+    }
   }
 }
