@@ -24,6 +24,8 @@ updates:
       - "dependencies"
     commit-message:
       prefix: "chore(bun)"
+    reviewers:
+      - "mqxym"
   - package-ecosystem: "github-actions"
     directory: "/"               
     schedule:
@@ -34,3 +36,5 @@ updates:
       - "infra"
     commit-message:
       prefix: "chore(ci)"
+    reviewers:
+      - "mqxym"
