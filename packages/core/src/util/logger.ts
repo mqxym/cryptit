@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------
-   Tiny, dependency‑free logger with five verbosity levels
+   Tiny, dependency-free logger with five verbosity levels
    ------------------------------------------------------------------ */
 export type Verbosity = 0 | 1 | 2 | 3 | 4;  // 0 = errors only … 4 = trace
 

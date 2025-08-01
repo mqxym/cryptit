@@ -16,7 +16,7 @@ await runBuild(
   entryNode,
   "--minify",
   "--format=esm",
-  "--external:argon2-browser",
+  "--external=argon2-browser",
   "--target=node",
   `--asset-naming=cryptit.index.[ext]`,
   "--sourcemap=external",
@@ -29,7 +29,7 @@ await runBuild(
   "--format=cjs",
   "--target=node",
   "--sourcemap=external",
-  "--external:argon2-browser",
+  "--external=argon2-browser",
   `--asset-naming=cryptit.index.[ext]`,
   `--outdir=${resolve(outdir, "cryptit.index.cjs")}`
 );
@@ -39,7 +39,7 @@ await runBuild(
   "--minify",
   "--format=cjs",
   "--target=node",
-  "--external:argon2-browser",
+  "--external=argon2-browser",
   "--sourcemap=external",
   `--outdir=${resolve(outdir, "cryptit.cli.cjs")}`,
   `--asset-naming=cryptit.cli.[ext]`
@@ -50,7 +50,7 @@ await runBuild(
   "--minify",
   "--format=esm",
   "--target=node",
-  "--external:argon2-browser",
+  "--external=argon2-browser",
   "--sourcemap=external",
   `--outdir=${resolve(outdir, "cryptit.cli.mjs")}`,
   `--asset-naming=cryptit.cli.[ext]`
@@ -59,7 +59,7 @@ await runBuild(
 await runBuild(
   entryCLI,
   "--compile",
-  "--external:argon2-browser",
+  "--external=argon2-browser",
   `--outfile=${resolve(outdir, "bin", "cryptit")}`
 );
 
@@ -69,9 +69,10 @@ await runBuild(
   "--target=browser",
   "--format=esm",
   "--sourcemap=external",
-  "--external:commander",
-  "--external:buffer",                      
-  "--external:process",
+  "--external=commander",
+  "--external=buffer",                      
+  "--external=process",
+  "--external=argon2",
   `--asset-naming=cryptit.browser.min.[ext]`,
   `--outdir=${resolve(outdir, "cryptit.browser.min.js")}`
 );
@@ -92,9 +93,5 @@ copyFileSync(srcWasm, dstWasm);
 copyFileSync(srcWasm, dstWasm2);
 
 await $`rm -rf ${join(outDir, 'cryptit.browser.min.wasm')}`;
-await $`rm -rf ${join(outdir, 'cryptit.cli.cjs', 'cryptit.cli.wasm')}`;
-await $`rm -rf ${join(outdir, 'cryptit.cli.mjs', 'cryptit.cli.wasm')}`;
-await $`rm -rf ${join(outdir, 'cryptit.index.mjs', 'cryptit.index.wasm')}`;
-await $`rm -rf ${join(outdir, 'cryptit.index.cjs', 'cryptit.index.wasm')}`;
 
 

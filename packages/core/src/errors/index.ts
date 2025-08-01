@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------
-   Centralised error hierarchy – keeps stack traces out of user‑space
+   Centralised error hierarchy – keeps stack traces out of user-space
    ------------------------------------------------------------------ */
 
 export class CryptitError extends Error {

@@ -1,12 +1,12 @@
 # @mqxym/cryptit
 
-Modern, cross‑platform **AES‑GCM 256 + Argon2‑id** encryption for both **files** *and* **text**.
+Modern, cross-platform **AES-GCM 256 + Argon2-id** encryption for both **files** *and* **text**.
 
 * **Node 18 / Bun 1** – native `argon2` addon + WebCrypto
 * **Browser (evergreen)** – tiny WASM build of `argon2-browser`
 * **CLI** – stream encryption & decryption, zero memory bloat
-* **TypeScript‑first**, tree‑shakable, ESM & CJS builds
-* **Format‑agnostic decryption** – one instance reads any registered version
+* **TypeScript-first**, tree-shakable, ESM & CJS builds
+* **Format-agnostic decryption** – one instance reads any registered version
 
 ---
 
@@ -104,9 +104,9 @@ Verbose levels:
 | ----- | ----------------------------- |
 | 0     | errors only                   |
 | 1     | +start/finish notices         |
-| 2     | +timings, key‑derivation info |
+| 2     | +timings, key-derivation info |
 | 3     | +salt / version / KDF details |
-| 4     | wire‑level debug              |
+| 4     | wire-level debug              |
 
 ---
 
@@ -158,9 +158,9 @@ bun install && bun run build && bun test
 
 ## Security
 
-* AES‑GCM 256 / 12‑byte IV / 128‑bit tag
-* Argon2‑id presets (low / middle / high)
-* Salts generated per‑ciphertext; never reused
+* AES-GCM 256 / 12-byte IV / 128-bit tag
+* Argon2-id presets (low / middle / high)
+* Salts generated per-ciphertext; never reused
 
 ---
 

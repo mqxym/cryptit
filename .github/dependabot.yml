@@ -1,0 +1,36 @@
+version: 2
+updates:
+#  - package-ecosystem: "npm"
+#    directory: "/"
+#    schedule:
+#      interval: "weekly"
+#      day_of_week: "monday"
+#    open-pull-requests-limit: 10
+#    labels:
+#      - "dependencies"
+#    commit-message:
+#      prefix: "chore(deps)"
+#    allow:
+#      - dependency-type: "direct"
+#      - dependency-type: "indirect"
+#
+  - package-ecosystem: "bun"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day_of_week: "saturday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "chore(bun)"
+  - package-ecosystem: "github-actions"
+    directory: "/"               
+    schedule:
+      interval: "weekly"
+      day_of_week: "saturday"
+    open-pull-requests-limit: 5
+    labels:
+      - "infra"
+    commit-message:
+      prefix: "chore(ci)"

@@ -1,0 +1,39 @@
+import { StreamProcessor }      from '../src/stream/StreamProcessor.js';
+import type { EncryptionAlgorithm } from '../src/types/index.js';
+
+class Rot1Engine implements EncryptionAlgorithm {
+  async encryptChunk(p: Uint8Array) {
+    return Uint8Array.from(p, v => (v + 1) & 0xFF);
+  }
+  async decryptChunk(c: Uint8Array) {
+    return Uint8Array.from(c, v => (v - 1) & 0xFF);
+  }
+}
+
+describe('StreamProcessor.collect', () => {
+  it('collects with prefix', async () => {
+    const engine = new Rot1Engine();
+    const sp     = new StreamProcessor(engine, 8);
+
+    const plain  = new Uint8Array([1, 2, 3, 4]);
+    const rs     = new ReadableStream({
+      start(c) { c.enqueue(plain); c.close(); },
+    });
+
+    const enc = await sp.collect(
+      rs,
+      sp.encryptionStream(),
+      new Uint8Array([9]),
+    );
+    // first byte is prefix
+    expect(enc[0]).toBe(9);
+
+    const dec = await sp.collect(
+      new ReadableStream({
+        start(c) { c.enqueue(enc.slice(1)); c.close(); },
+      }),
+      sp.decryptionStream(0),
+    );
+    expect(dec).toEqual(plain);
+  });
+});

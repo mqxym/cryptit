@@ -72,7 +72,7 @@ export interface CryptitOptions {
  * Cryptit provides high-level encryption/decryption utilities for text, blobs, and streams.
  */
 export class Cryptit {
-  // — runtime‑mutable --------------------------------------------------------
+  // — runtime-mutable --------------------------------------------------------
   private v          : VersionDescriptor;
   private cipher     : EncryptionAlgorithm;
   private kdf        : KeyDerivation;
@@ -147,7 +147,7 @@ export class Cryptit {
   }
 
   // ════════════════════════════════════════════════════════════════════════
-  //  PUBLIC  – Setters / getters for run‑time flexibility
+  //  PUBLIC  – Setters / getters for run-time flexibility
   // ════════════════════════════════════════════════════════════════════════
   /** Set the difficulty level for subsequent operations. */
   setDifficulty(d: Difficulty): void         { this.difficulty = d; }
@@ -222,7 +222,9 @@ export class Cryptit {
       this.log.log(3, 'Encoding header');
       const header = encodeHeader(this.v.id, this.difficulty, this.saltStrength, salt);
       this.log.log(3, 'Encoding text');
-      return base64Encode(header, cipher);
+      const result = base64Encode(header, cipher);
+      this.log.log(1, 'Decryption finished');
+      return result;
 
     } catch (err) {
       throw new EncryptionError(
@@ -241,6 +243,7 @@ export class Cryptit {
   async decryptText(b64: string, pass: string): Promise<string> {
     try {
       this.log.log(1, 'Start text decryption');
+      this.log.log(3, 'Start text decoding');
       const data   = base64Decode(b64);
       this.log.log(3, 'Start header decoding');
       await Cryptit.peekHeader(b64);
@@ -256,7 +259,9 @@ export class Cryptit {
         data.slice(hdr.headerLen),
       );
       this.log.log(3, 'Decoding text');
-      return new TextDecoder().decode(plainBytes);
+      const text = new TextDecoder().decode(plainBytes);
+      this.log.log(1, 'Decryption finished');
+      return text;
 
     } catch (err) {
       if (
@@ -373,7 +378,7 @@ export class Cryptit {
   ): Promise<TransformStream<Uint8Array, Uint8Array>> {
 
     const self = this;
-    let   buf  = new Uint8Array(0);
+    let   buf: Uint8Array<ArrayBufferLike>  = new Uint8Array(0);
     let   downstream: TransformStream<Uint8Array, Uint8Array> | null = null;
 
     async function pipeOut(
@@ -391,6 +396,7 @@ export class Cryptit {
     return new TransformStream<Uint8Array, Uint8Array>({
       async transform(chunk, ctl) {
         if (!downstream) {
+          
           buf = concat(buf, chunk);
           if (buf.length < 2) return;
 

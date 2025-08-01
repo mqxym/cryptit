@@ -1,8 +1,7 @@
 import { EncodingError, DecodingError } from "../errors/index.js";
 
 /**
- * Tiny run-time test – are we really in Node/Bun, **not** a browser bundle
- * that merely polyfilled `Buffer`?
+ * Tiny run-time test – are we really in Node/Bun
  */
 function isNodeLike(): boolean {
   return (
@@ -50,6 +49,10 @@ export function base64Encode(...chunks: Uint8Array[]): string {
 /* ----------  Base64 decode  --------------------------------------- */
 export function base64Decode(b64: string): Uint8Array {
   try {
+    if (!/^[A-Za-z0-9+/]+={0,2}$/.test(b64) || b64.length % 4 !== 0) {
+      throw new Error('invalid base64');
+    }
+    
     if (isNodeLike()) {
       return new Uint8Array((Buffer as any).from(b64, 'base64'));
     }
