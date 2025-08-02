@@ -15,3 +15,23 @@ describe('Cryptit file helpers', () => {
     expect(await dec.arrayBuffer()).toEqual(await plain.arrayBuffer());
   });
 });
+
+/* ------------------------------------------------------------------ */
+/*  Empty-blob round-trip                                             */
+/* ------------------------------------------------------------------ */
+describe('Cryptit file helpers - extra cases', () => {
+  const crypt = new Cryptit(nodeProvider);
+
+  it('round-trips a **zero-byte Blob**', async () => {
+    const empty = new Blob([]);
+    const enc   = await crypt.encryptFile(empty, 'pw');
+    const dec   = await crypt.decryptFile(enc, 'pw');
+    expect(dec.size).toBe(0);
+  });
+
+  it('encrypts empty blob without unhandled rejections', async () => {
+    const crypt = new Cryptit(nodeProvider);
+    const empty = new Blob([]);
+    await expect(crypt.encryptFile(empty, 'pw')).resolves.toBeInstanceOf(Blob);
+  });
+});

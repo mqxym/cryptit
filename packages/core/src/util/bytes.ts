@@ -1,7 +1,7 @@
 import { EncodingError, DecodingError } from "../errors/index.js";
 
 /**
- * Tiny run-time test – are we really in Node/Bun
+ * Tiny run-time test - are we really in Node/Bun
  */
 function isNodeLike(): boolean {
   return (
@@ -62,8 +62,9 @@ export function base64Decode(b64: string): Uint8Array {
     for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
     return out;
   } catch (err: any) {
-    const msg = "Base64 Decoding Error";
-    throw new DecodingError(msg);
+      throw new DecodingError(
+      `Invalid Base64: length=${b64.length}, content='${b64.slice(0,12)}…'`,
+    );
   }  
 }
 

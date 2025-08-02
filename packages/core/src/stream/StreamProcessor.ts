@@ -53,10 +53,16 @@ export class StreamProcessor {
     const chunks: Uint8Array[] = [];
     if (prefix?.length) chunks.push(prefix);
 
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      chunks.push(value);
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+      }
+
+      await reader.closed;
+    } finally {
+      reader.releaseLock();
     }
 
     const total = chunks.reduce((n, c) => n + c.byteLength, 0);

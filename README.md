@@ -2,11 +2,11 @@
 
 Modern, cross-platform **AES-GCM 256 / XChaCha20Poly1305 + Argon2-id** encryption for both **files** *and* **text**.
 
-* **Node 18 / Bun 1** – native `argon2` addon + WebCrypto
-* **Browser (evergreen)** – tiny WASM build of `argon2-browser`
-* **CLI** – stream encryption & decryption, zero memory bloat
+* **Node 18 / Bun 1** - native `argon2` addon + WebCrypto
+* **Browser (evergreen)** - tiny WASM build of `argon2-browser`
+* **CLI** - stream encryption & decryption, zero memory bloat
 * **TypeScript-first**, tree-shakable, ESM & CJS builds
-* **Format-agnostic decryption** – one instance reads any registered scheme
+* **Format-agnostic decryption** - one instance reads any registered scheme
 
 ---
 
@@ -22,7 +22,7 @@ yarn add @mqxym/cryptit           # or npm i / pnpm add
 
 ---
 
-## Quick start – Node / Bun
+## Quick start - Node / Bun
 
 ```ts
 import { createCryptit } from "@mqxym/cryptit";

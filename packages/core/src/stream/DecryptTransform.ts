@@ -42,6 +42,11 @@ export class DecryptTransform {
         combined.byteOffset + offset,
         4,
       ).getUint32(0, false);
+        if (cipherLen > this.chunkSize * 2) {
+          throw new DecryptionError(
+            `Frame length ${cipherLen} exceeds maximum allowed ${this.chunkSize * 2}`,
+          );
+        }
       if (combined.length - offset - 4 < cipherLen) break;
 
       offset += 4;

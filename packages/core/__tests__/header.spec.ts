@@ -19,3 +19,17 @@ describe('header encode/decode', () => {
     expect(() => decodeHeader(broken)).toThrow(InvalidHeaderError);
   });
 });
+
+import { HeaderDecodeError } from '../src/errors/index.js';               // NEW
+
+/* ------------------------------------------------------------------ */
+/*  Unknown-scheme detection                                          */
+/* ------------------------------------------------------------------ */
+describe('header encode/decode - extra cases', () => {
+  const salt = new Uint8Array(12).fill(7);
+
+  it('throws on **unknown scheme id**', () => {
+    const bad = encodeHeader(7, 'low', 'low', salt);   // id 7 is unregistered
+    expect(() => decodeHeader(bad)).toThrow(HeaderDecodeError);
+  });
+});

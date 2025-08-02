@@ -109,7 +109,7 @@ export class Cryptit {
   }
 
   // ════════════════════════════════════════════════════════════════════════
-  //  PUBLIC  – Informational helpers
+  //  PUBLIC  - Informational helpers
   // ════════════════════════════════════════════════════════════════════════
 
   /**
@@ -147,7 +147,7 @@ export class Cryptit {
   }
 
   // ════════════════════════════════════════════════════════════════════════
-  //  PUBLIC  – Setters / getters for run-time flexibility
+  //  PUBLIC  - Setters / getters for run-time flexibility
   // ════════════════════════════════════════════════════════════════════════
   /** Set the difficulty level for subsequent operations. */
   setDifficulty(d: Difficulty): void         { this.difficulty = d; }
@@ -302,6 +302,23 @@ export class Cryptit {
    */
   async encryptFile(file: Blob, pass: string): Promise<Blob> {
     try {
+
+      if (file.size === 0) {
+        const salt = this.genSalt();
+        await this.deriveKey(pass, salt);
+
+        pass = secureOverwriteString(pass);
+        pass = null as any;
+
+        const header = encodeHeader(
+          this.v.id,
+          this.difficulty,
+          this.saltStrength,
+          salt,
+        );
+        /* nothing to encrypt ⇒ header alone is a valid container */
+        return new Blob([header], { type: 'application/octet-stream' });
+      }
       this.log.log(2, 'Deriving key for file encryption');
       const salt = this.genSalt();
       await this.deriveKey(pass, salt);
@@ -346,6 +363,12 @@ export class Cryptit {
 
       pass = secureOverwriteString(pass);
       pass = null as any;
+
+      // ── 0-byte optimisation ────────────────────────────────────────
+      if (file.size === parsed.headerLen) {
+        /* container carries header only - nothing to decrypt */
+        return new Blob([], { type: 'application/octet-stream' });
+      }
 
       this.log.log(2, 'Decrypting file data');
       const streamProc = new StreamProcessor(engine.cipher, engine.chunkSize);
@@ -502,7 +525,7 @@ export class Cryptit {
   }
 
   // ────────────────────────────────────────────────────────────────────
-  //  Static helper – read just enough bytes to parse the header
+  //  Static helper - read just enough bytes to parse the header
   // ────────────────────────────────────────────────────────────────────
   /**
    * Read minimal bytes to extract and validate Cryptit header.
