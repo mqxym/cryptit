@@ -1,6 +1,6 @@
 {
     "name": "@mqxym/cryptit",
-    "version": "0.2.5",
+    "version": "0.2.6",
     "type": "module",
     "workspaces": [
         "packages/*"
@@ -35,18 +35,18 @@
     },
     "exports": {
         ".": {
-            "import": "./dist/cryptit.index.mjs/index.js",
-            "require": "./dist/cryptit.index.cjs/index.js"
+            "import": "./dist/cryptit.index.js",
+            "require": "./dist/cryptit.index.cjs"
         },
         "./browser": {
-            "import": "./dist/cryptit.browser.min.js/index.js",
-            "require": "./dist/cryptit.browser.min.js/index.js"
+            "import": "./dist/browser/cryptit.browser.min.js",
+            "require": "./dist/browser/cryptit.browser.min.js"
         },
         "./cli": {
-            "import": "./dist/cryptit.cli.mjs/cli.js",
-            "require": "./dist/cryptit.cli.cjs/cli.js"
+            "import": "./dist/cli/cryptit.cli.js",
+            "require": "./dist/cli/cryptit.cli.cjs"
         },
-        "./*.wasm": "./dist/*.wasm"
+        "./*.wasm": "./dist/browser/*.wasm"
     },
     "bin": {
         "cryptit": "./dist/bin/cryptit"

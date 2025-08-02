@@ -1,97 +1,124 @@
-import { $ } from "bun";
-import { resolve, join, dirname } from 'node:path';
+// bun.build.js
+import { rmSync, copyFileSync, mkdirSync } from 'node:fs';
+import { resolve, join } from 'node:path';
 
+// Clean output dir
 const outdir = "dist";
 
-// Ensure clean output dir (optional)
-await $`rm -rf ${outdir}`;
+const outdirCLI = join(outdir, "cli");
+const outdirBrowser = join(outdir, "browser");
 
-// === Build Targets ===
+rmSync(outdir, { recursive: true, force: true });
+mkdirSync(outdir, { recursive: true });
 
-const entryNode     = "packages/node-runtime/src/index.ts"
-const entryBrowser  = "packages/browser-runtime/src/index.ts";
-const entryCLI      = "packages/node-runtime/src/cli.ts";
+// Bundles via Bun.build()
 
-await runBuild(
-  entryNode,
-  "--minify",
-  "--format=esm",
-  "--external=argon2-browser",
-  "--target=node",
-  `--asset-naming=cryptit.index.[ext]`,
-  "--sourcemap=external",
-  `--outdir=${resolve(outdir, "cryptit.index.mjs")}`
-);
-
-await runBuild(
-  entryNode,
-  "--minify",
-  "--format=cjs",
-  "--target=node",
-  "--sourcemap=external",
-  "--external=argon2-browser",
-  `--asset-naming=cryptit.index.[ext]`,
-  `--outdir=${resolve(outdir, "cryptit.index.cjs")}`
-);
-
-await runBuild(
-  entryCLI,
-  "--minify",
-  "--format=cjs",
-  "--target=node",
-  "--external=argon2-browser",
-  "--sourcemap=external",
-  `--outdir=${resolve(outdir, "cryptit.cli.cjs")}`,
-  `--asset-naming=cryptit.cli.[ext]`
-);
-
-await runBuild(
-  entryCLI,
-  "--minify",
-  "--format=esm",
-  "--target=node",
-  "--external=argon2-browser",
-  "--sourcemap=external",
-  `--outdir=${resolve(outdir, "cryptit.cli.mjs")}`,
-  `--asset-naming=cryptit.cli.[ext]`
-);
-
-await runBuild(
-  entryCLI,
-  "--compile",
-  "--external=argon2-browser",
-  `--outfile=${resolve(outdir, "bin", "cryptit")}`
-);
-
-await runBuild(
-  [entryBrowser],
-  "--minify",
-  "--target=browser",
-  "--format=esm",
-  "--sourcemap=external",
-  "--external=commander",
-  "--external=buffer",                      
-  "--external=process",
-  "--external=argon2",
-  `--asset-naming=cryptit.browser.min.[ext]`,
-  `--outdir=${resolve(outdir, "cryptit.browser.min.js")}`
-);
-
-async function runBuild(entryFile, ...flags) {
-  await $`bun build ${entryFile} ${flags}`;
+// Helper to check success
+async function doBuild(opts) {
+  const result = await Bun.build(opts);
+  if (!result.success) {
+    for (const log of result.logs) {
+      console.error(log.text || log);
+    }
+    throw new Error("Build failed");
+  }
 }
 
-import { copyFileSync } from 'node:fs';
+// ---- Node runtime (ESM) ----
+await doBuild({
+  entrypoints: ["packages/node-runtime/src/index.ts"],
+  outdir: outdir,
+  minify: true,
+  format: "esm",
+  external: ["argon2-browser"],
+  target: "node",
+  naming: {
+    entry: "cryptit.index.[ext]",
+    chunk: "[name]-[hash].[ext]",
+    asset: "[name]-[hash].[ext]",
+  },
+  sourcemap: "external",
+});
 
-const outDir = resolve(__dirname, 'dist', 'cryptit.browser.min.js');
+// ---- Node runtime (CJS) ----
+await doBuild({
+  entrypoints: ["packages/node-runtime/src/index.ts"],
+  outdir: outdir,
+  minify: true,
+  format: "cjs",
+  external: ["argon2-browser"],
+  target: "node",
+  naming: {
+    entry: "cryptit.index.cjs",
+    chunk: "[name]-[hash].[ext]",
+    asset: "[name]-[hash].[ext]",
+  },
+  sourcemap: "external",
+});
 
-const srcWasm = join(outDir, 'cryptit.browser.min.wasm');
-const dstWasm = join(outDir, 'argon2.wasm');
-const dstWasm2 = join('examples', 'dist', 'argon2.wasm')
+// ---- CLI (CJS) ----
+await doBuild({
+  entrypoints: ["packages/node-runtime/src/cli.ts"],
+  outdir: outdirCLI,
+  minify: true,
+  format: "cjs",
+  external: ["argon2-browser"],
+  target: "node",
+  naming: {
+    entry: "cryptit.cli.cjs",
+    chunk: "[name]-[hash].[ext]",
+    asset: "[name]-[hash].[ext]",
+  },
+  sourcemap: "external",
+});
 
-copyFileSync(srcWasm, dstWasm);
-copyFileSync(srcWasm, dstWasm2);
+// ---- CLI (ESM) ----
+await doBuild({
+  entrypoints: ["packages/node-runtime/src/cli.ts"],
+  outdir: outdirCLI,
+  minify: true,
+  format: "esm",
+  external: ["argon2-browser"],
+  target: "node",
+  naming: {
+    entry: "cryptit.cli.[ext]",
+    chunk: "[name]-[hash].[ext]",
+    asset: "[name]-[hash].[ext]",
+  },
+  sourcemap: "external",
+});
 
-await $`rm -rf ${join(outDir, 'cryptit.browser.min.wasm')}`;
+// Compile CLI to standalone binary (fallback to CLI flag)
+await Bun.spawn({
+  cmd: [
+    "bun",
+    "build",
+    "--compile",
+    "--external=argon2-browser",
+    `--outfile=${resolve(outdir, "bin", "cryptit")}`,
+    "packages/node-runtime/src/cli.ts",
+  ],
+});
 
+// ---- Browser bundle ----
+await doBuild({
+  entrypoints: ["packages/browser-runtime/src/index.ts"],
+  outdir: outdirBrowser,
+  minify: true,
+  format: "esm",
+  external: ["commander", "buffer", "process", "argon2"],
+  target: "browser",
+  naming: {
+    entry: "cryptit.browser.min.[ext]",
+    chunk: "[name]-[hash].[ext]",
+    asset: "[name].[ext]",
+  },
+  sourcemap: "external",
+});
 
+// Post-build WASM handling
+const wasmSrc = join(outdirBrowser, "argon2.wasm");
+const wasmDst = join("examples", "argon2.wasm");
+copyFileSync(wasmSrc, wasmDst);
+
+console.log("All builds complete");

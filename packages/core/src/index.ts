@@ -158,14 +158,14 @@ export class Cryptit {
    * Change the protocol version for future encrypt/decrypt actions.
    * @param id - Version identifier from registry
    */
-  setVersion(id: number): void {
+  setScheme(id: number): void {
     this.v       = VersionRegistry.get(id);
     this.cipher  = new this.v.cipher(this.provider);
     this.kdf     = this.v.kdf;
     this.stream  = new StreamProcessor(this.cipher, this.chunkSize);
   }
   /** Retrieve the active protocol version identifier. */
-  getVersion(): number                       { return this.v.id; }
+  getScheme(): number                       { return this.v.id; }
 
   /**
    * Override salt length (in bytes) for new operations (advanced use).
@@ -209,7 +209,7 @@ export class Cryptit {
    */
   async encryptText(plain: string | Uint8Array, pass: string): Promise<string> {
     try {
-      this.log.log(1, `Start text encryption, Version ${this.getVersion()}`);
+      this.log.log(1, `Start text encryption, scheme: ${this.getScheme()}`);
       this.log.log(2, 'Deriving key for text encryption');
       const salt = this.genSalt();
       await this.deriveKey(pass, salt);
@@ -242,7 +242,7 @@ export class Cryptit {
    */
   async decryptText(b64: string, pass: string): Promise<string> {
     try {
-      this.log.log(1, `Start text decryption, Version ${this.getVersion()}`);
+      this.log.log(1, `Start text decryption, Version ${this.getScheme()}`);
       this.log.log(3, 'Start text decoding');
       const data   = base64Decode(b64);
       this.log.log(3, 'Start header decoding');
@@ -250,7 +250,7 @@ export class Cryptit {
       const hdr    = decodeHeader(data);
       this.log.log(3, 'Trying to get engine');
       const engine = EngineManager.getEngine(this.provider, hdr.version);
-      this.log.log(2, 'Deriving key via engine for text decryption');
+      this.log.log(2, `Deriving key via engine for scheme: ${hdr.version}`);
       this.log.log(3, `Salt use: ${base64Encode(hdr.salt)}, KDF difficulty: ${hdr.difficulty}`);
       await EngineManager.deriveKey(engine, pass, hdr.salt, hdr.difficulty);
 
@@ -458,7 +458,7 @@ export class Cryptit {
     const start = performance.now();
     try {
       const key = await this.kdf.derive(pass, salt, diff, this.provider);
-      (this.cipher as any).setKey(key);
+      await this.cipher.setKey(key);
       this.log.log(3, `Key derivation completed in ${(performance.now() - start).toFixed(1)} ms`);
     } catch (err) {
       throw new KeyDerivationError(

@@ -4,6 +4,7 @@ import type { CryptoProvider } from '../providers/CryptoProvider.js';
 export interface EncryptionAlgorithm {
   encryptChunk(plain : Uint8Array): Promise<Uint8Array>;
   decryptChunk(cipher: Uint8Array): Promise<Uint8Array>;
+  setKey(k: CryptoKey): Promise<void>;
 }
 
 /* ------------------------- Key derivation ---------------------------- */

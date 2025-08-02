@@ -10,7 +10,7 @@ import { createCryptit } from './index.js';
 import { VersionRegistry } from '../../core/src/config/VersionRegistry.js';
 import { Cryptit } from '../../core/src/index.js';
 
-const PKG_VERSION = '0.2.5'; // sync with root package.json
+const PKG_VERSION = '0.2.6'; // sync with root package.json
 
 async function promptPass(): Promise<string> {
   if (!stdin.isTTY) throw new Error('STDIN not a TTY; use --pass');
@@ -59,7 +59,19 @@ const program = new Command();
 program
   .name('cryptit')
   .version(PKG_VERSION)
-  .description('AES-GCM / Argon2 encryption utility')
+  .description('Text and File Encryption Utility\n' + 'Scheme 0: AES-GCM / Argon2id (Single Thread)\n' +'Scheme 1: XChaCha20-Poly1305 / Argon2id (Parallel)')
+
+  .addOption(
+    new Option('-S, --scheme <0-1>', 'encryption scheme version')
+      .argParser((v) => {
+        const n = Number(v);
+        if (!Number.isInteger(n) || n < 0 || n > 7) {
+          throw new Error('Version size must be a integer between 0 and 7');
+        }
+        return n;
+      })
+      .default(0, '0')
+  )
 
   // passphrase (hidden from --help if you want)
   .addOption(
@@ -96,18 +108,6 @@ program
         return n;
       })
       .default(512 * 1024, '512*1024')
-  )
-
-  .addOption(
-    new Option('--scheme <0-1>', 'encryption scheme version')
-      .argParser((v) => {
-        const n = Number(v);
-        if (!Number.isInteger(n) || n < 0 || n > 7) {
-          throw new Error('Version size must be a integer between 0 and 7');
-        }
-        return n;
-      })
-      .default(0, '0')
   )
 
   // verbosity (repeatable)

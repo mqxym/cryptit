@@ -8,7 +8,7 @@ export class AESGCM implements EncryptionAlgorithm {
 
   constructor(private readonly p: CryptoProvider) {}
 
-  setKey(k: CryptoKey) { this.key = k; }
+  async setKey(k: CryptoKey) { this.key = k; }
 
   async encryptChunk(plain: Uint8Array): Promise<Uint8Array> {
     const iv = this.p.getRandomValues(new Uint8Array(12));

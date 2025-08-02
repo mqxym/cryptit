@@ -14,7 +14,7 @@
       "files": "*.ts",
       "options": {
         "tabWidth": 2,
-        "printWidth": 150
+        "printWidth": 120
       }
     }
   ]

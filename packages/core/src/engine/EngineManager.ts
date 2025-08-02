@@ -43,7 +43,7 @@ export class EngineManager {
   ): Promise<void> {
     try {
       const key = await engine.kdf.derive(pass, salt, diff as any, engine.provider);
-      (engine.cipher as any).setKey(key);
+      await engine.cipher.setKey(key);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       throw new KeyDerivationError(msg);

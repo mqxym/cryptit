@@ -29,9 +29,10 @@
             <input type="password" value="abc" class="form-control" id="secret" placeholder="Enter passphrase">
           </div>
           <div class="col-md-4">
-            <label for="version" class="form-label">Version ID</label>
+            <label for="version" class="form-label">Scheme ID (0 - max. 7)</label>
             <input type="number" min="0" value="0" class="form-control" id="version">
-            <div class="form-text">Format version (0 = current)</div>
+            <div class="form-text">0 = AES-GCM / Argon2id (single thread)</div>
+            <div class="form-text">1 = XChaCha20-Poly1305 / Argon2id (multithread)</div>
           </div>
           <div class="col-md-4">
             <label for="difficulty" class="form-label">Argon2 Difficulty</label>
@@ -78,7 +79,7 @@
   </div>
 
   <script type="module">
-    import { createCryptit } from "../dist/cryptit.browser.min.js/index.js"; 
+    import { createCryptit } from "../dist//browser/cryptit.browser.min.js"; 
     window.createCryptit = createCryptit; 
                           
   </script>

@@ -66,19 +66,15 @@ export async function argon2id(
   // ————————————————————————————  Browser  ————————————————————————————
 if (env === "browser") {
   
-  if (!('loadArgon2WasmBinary' in globalThis)) {
-    (globalThis as any).loadArgon2WasmBinary = () => {
-      const url = new URL('argon2.wasm', import.meta.url).href;
-      return fetch(url)
-        .then(res => {
-          if (!res.ok) {
-            throw new Error('Failed to load argon2.wasm');
-          }
-          return res.arrayBuffer();
-        })
-        .then(buf => new Uint8Array(buf));
-    };
-  }
+    if (!("loadArgon2WasmBinary" in globalThis)) {
+      ;(globalThis as any).loadArgon2WasmBinary = () =>
+        fetch("argon2.wasm")
+          .then(res => {
+            if (!res.ok) throw new Error("Failed to load argon2.wasm");
+            return res.arrayBuffer();
+          })
+          .then(buf => new Uint8Array(buf));
+    }
 
  return Argon2Browser.hash({
     pass        : password,

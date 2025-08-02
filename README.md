@@ -1,6 +1,6 @@
 # @mqxym/cryptit
 
-Modern, cross-platform **AES-GCM 256 + Argon2-id** encryption for both **files** *and* **text**.
+Modern, cross-platform **AES-GCM 256 / XChaCha20Poly1305 + Argon2-id** encryption for both **files** *and* **text**.
 
 * **Node 18 / Bun 1** – native `argon2` addon + WebCrypto
 * **Browser (evergreen)** – tiny WASM build of `argon2-browser`
@@ -90,7 +90,7 @@ await c.decryptText(b64,  pass);
 
 // runtime tweaks
 c.setDifficulty("high");
-c.setVersion(2);           // choose another registered format
+c.setScheme(1);           // choose another registered format (version 1 = XChaCha20Poly1305)
 c.setSaltDifficulty("low");
 
 // helpers
@@ -131,6 +131,7 @@ cat movie.enc | cryptit decode
 | ------------------------- | ------- | -------------------- |
 | `-p, --pass <pw>`         | prompt  | passphrase           |
 | `-d, --difficulty <l>`    | middle  | Argon2 preset        |
+| `-S, --scheme <0-1>. `    | 0.      | Scheme preset        |
 | `-s, --salt-strength <l>` | high    | 12 B vs 16 B salt    |
 | `-c, --chunk-size <n>`    | 524 288 | plaintext block size |
 | `-v, --verbose`           |  0 … 4  | repeat to increase   |
