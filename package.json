@@ -1,9 +1,29 @@
 {
     "name": "@mqxym/cryptit",
     "version": "0.2.7",
+    "description": "Modern, cross-platform AES-GCM 256 / XChaCha20Poly1305 + Argon2-id encryption for files and text.",
     "type": "module",
+    "keywords": [
+        "utility",
+        "cli",
+        "typescript",
+        "bun",
+        "crossplatform"
+    ],
+    "homepage": "https://github.com/mqxym/cryptit",
+    "bugs": {
+        "url": "https://github.com/mqxym/cryptit/issues"
+    },
+    "license": "MIT",
     "workspaces": [
         "packages/*"
+    ],
+    "main": "dist/cryptit.index.cjs",
+    "module": "dist/cryptit.index.js",
+    "files": [
+        "dist/",
+        "README.md",
+        "LICENSE"
     ],
     "scripts": {
         "build:dts": "tsc -b",
@@ -15,7 +35,8 @@
         "cli:run": "bun run packages/node-runtime/src/cli.ts"
     },
     "engines": {
-        "bun": ">=1.0.0"
+        "bun": ">=1.0.0",
+        "node": ">=18"
     },
     "dependencies": {
         "@noble/ciphers": "^1.3.0",
