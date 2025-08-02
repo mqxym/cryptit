@@ -43,7 +43,7 @@ describe('cryptit (CLI)', () => {
 
       const meta = JSON.parse(stdout);
       expect(meta).toMatchObject({
-          version: 0,
+          scheme: 0,
           difficulty: 'middle',
       });
   });

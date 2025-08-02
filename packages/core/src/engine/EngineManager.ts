@@ -1,6 +1,6 @@
-import { VersionRegistry } from '../config/VersionRegistry.js';
+import { SchemeRegistry } from '../config/SchemeRegistry.js';
 import type {
-  VersionDescriptor,
+  SchemeDescriptor,
   EncryptionAlgorithm,
   KeyDerivation,
 } from '../types/index.js';
@@ -8,7 +8,7 @@ import type { CryptoProvider } from '../providers/CryptoProvider.js';
 import { KeyDerivationError } from '../errors/index.js';
 
 export interface Engine {
-  desc      : VersionDescriptor;
+  desc      : SchemeDescriptor;
   cipher    : EncryptionAlgorithm;
   kdf       : KeyDerivation;
   chunkSize : number;
@@ -20,18 +20,18 @@ const _cache = new Map<number, Engine>();
 export class EngineManager {
   static getEngine(
     provider : CryptoProvider,
-    versionId: number,
+    schemeId: number,
   ): Engine {
-    let e = _cache.get(versionId);
+    let e = _cache.get(schemeId);
     if (e) return e;
 
-    const desc      = VersionRegistry.get(versionId);
+    const desc      = SchemeRegistry.get(schemeId);
     const cipher    = new desc.cipher(provider);
     const kdf       = desc.kdf;
     const chunkSize = desc.defaultChunkSize;
 
     e = { desc, cipher, kdf, chunkSize, provider };
-    _cache.set(versionId, e);
+    _cache.set(schemeId, e);
     return e;
   }
 

@@ -9,9 +9,9 @@ import { decodeHeader }             from './header/decoder.js';
 import {
   EncryptionAlgorithm,
   KeyDerivation,
-  VersionDescriptor,
+  SchemeDescriptor,
 } from './types/index.js';
-import { VersionRegistry }          from './config/VersionRegistry.js';
+import { SchemeRegistry }          from './config/SchemeRegistry.js';
 import { base64Encode, base64Decode, concat } from './util/bytes.js';
 import { StreamProcessor }          from './stream/StreamProcessor.js';
 import { EncryptTransform }         from './stream/EncryptTransform.js';
@@ -54,8 +54,8 @@ export interface EncryptStreamResult {
  * Options for configuring Cryptit instance behavior.
  */
 export interface CryptitOptions {
-  /** Version identifier (0…7) to use; defaults to registry's current version */
-  version?      : number;
+  /** Version identifier (0…7) to use; defaults to registry's current scheme */
+  scheme?      : number;
   /** Salt strength: 'low' | 'middle' | 'high'; defaults to descriptor's default */
   saltStrength? : SaltStrength;
   /** Key derivation difficulty; defaults to descriptor's default */
@@ -73,7 +73,7 @@ export interface CryptitOptions {
  */
 export class Cryptit {
   // — runtime-mutable --------------------------------------------------------
-  private v          : VersionDescriptor;
+  private v          : SchemeDescriptor;
   private cipher     : EncryptionAlgorithm;
   private kdf        : KeyDerivation;
   private chunkSize  : number;
@@ -90,13 +90,13 @@ export class Cryptit {
   /**
    * Create a new Cryptit instance with given crypto provider and options.
    * @param provider - Underlying crypto provider for key derivation and randomness
-   * @param opt - Configuration options for version, salts, logging, etc.
+   * @param opt - Configuration options for scheme, salts, logging, etc.
    */
   constructor(
     private readonly provider: CryptoProvider,
     opt: CryptitOptions = {},
   ) {
-    this.v          = VersionRegistry.get(opt.version ?? VersionRegistry.current.id);
+    this.v          = SchemeRegistry.get(opt.scheme ?? SchemeRegistry.current.id);
     this.cipher     = new this.v.cipher(provider);
     this.kdf        = this.v.kdf;
     this.chunkSize  = opt.chunkSize ?? this.v.defaultChunkSize;
@@ -131,15 +131,15 @@ export class Cryptit {
   /**
    * Decode the Cryptit header and return readable metadata.
    * @param input - Base64 string, Uint8Array, or Blob to decode
-   * @returns Object containing version, difficulty, salt (Base64), and salt length
+   * @returns Object containing scheme, difficulty, salt (Base64), and salt length
    */
   static async headerDecode(
     input: string | Uint8Array | Blob,
-  ): Promise<{ version: number; difficulty: Difficulty; salt: string; saltLength: number; }> {
+  ): Promise<{ scheme: number; difficulty: Difficulty; salt: string; saltLength: number; }> {
     const hdr = await Cryptit.peekHeader(input);
     const h   = decodeHeader(hdr);
     return {
-      version    : h.version,
+      scheme    : h.scheme,
       difficulty : h.difficulty,
       salt       : base64Encode(h.salt),
       saltLength : h.salt.byteLength,
@@ -155,16 +155,16 @@ export class Cryptit {
   getDifficulty(): Difficulty                { return this.difficulty; }
 
   /**
-   * Change the protocol version for future encrypt/decrypt actions.
+   * Change the protocol scheme for future encrypt/decrypt actions.
    * @param id - Version identifier from registry
    */
   setScheme(id: number): void {
-    this.v       = VersionRegistry.get(id);
+    this.v       = SchemeRegistry.get(id);
     this.cipher  = new this.v.cipher(this.provider);
     this.kdf     = this.v.kdf;
     this.stream  = new StreamProcessor(this.cipher, this.chunkSize);
   }
-  /** Retrieve the active protocol version identifier. */
+  /** Retrieve the active protocol scheme identifier. */
   getScheme(): number                       { return this.v.id; }
 
   /**
@@ -249,8 +249,8 @@ export class Cryptit {
       await Cryptit.peekHeader(b64);
       const hdr    = decodeHeader(data);
       this.log.log(3, 'Trying to get engine');
-      const engine = EngineManager.getEngine(this.provider, hdr.version);
-      this.log.log(2, `Deriving key via engine for scheme: ${hdr.version}`);
+      const engine = EngineManager.getEngine(this.provider, hdr.scheme);
+      this.log.log(2, `Deriving key via engine for scheme: ${hdr.scheme}`);
       this.log.log(3, `Salt use: ${base64Encode(hdr.salt)}, KDF difficulty: ${hdr.difficulty}`);
       await EngineManager.deriveKey(engine, pass, hdr.salt, hdr.difficulty);
 
@@ -312,7 +312,7 @@ export class Cryptit {
   }
 
   /* ──────────────────────────────────────────────────────────
-     Decrypt a Blob that carries its own header (any version)
+     Decrypt a Blob that carries its own header (any scheme)
      ────────────────────────────────────────────────────────── */
   /**
    * Decrypt an encrypted Blob using the embedded header for parameters.
@@ -325,7 +325,7 @@ export class Cryptit {
     try {
       const header = await Cryptit.peekHeader(file);
       const parsed = decodeHeader(header);
-      const engine = EngineManager.getEngine(this.provider, parsed.version);
+      const engine = EngineManager.getEngine(this.provider, parsed.scheme);
 
       await EngineManager.deriveKey(engine, pass, parsed.salt, parsed.difficulty);
 
@@ -366,7 +366,7 @@ export class Cryptit {
   }
 
   /* ──────────────────────────────────────────────────────────
-     Streaming decryption (auto-detect header, any version)
+     Streaming decryption (auto-detect header, any scheme)
      ────────────────────────────────────────────────────────── */
   /**
    * Create a TransformStream for decrypting incoming ciphertext with header auto-detection.
@@ -403,13 +403,13 @@ export class Cryptit {
           const header             = buf.slice(0, 30); // Raw estimate
           const { salt, difficulty } = decodeHeader(header);
 
-          const version      = buf[1] >> 5;
+          const scheme      = buf[1] >> 5;
           const saltStrength = ((buf[1] >> 2) & 1) ? 'high' : 'low';
-          const saltLen      = VersionRegistry.get(version).saltLengths[saltStrength];
+          const saltLen      = SchemeRegistry.get(scheme).saltLengths[saltStrength];
           const hdrLen       = 2 + saltLen;
           if (buf.length < hdrLen) return;
         
-          const engine  = EngineManager.getEngine(self.provider, version);
+          const engine  = EngineManager.getEngine(self.provider, scheme);
           await EngineManager.deriveKey(engine, passphrase, salt, difficulty);
 
           downstream = new DecryptTransform(engine.cipher, engine.chunkSize).toTransformStream();
@@ -506,9 +506,9 @@ export class Cryptit {
       if (first2[0] !== 0x01) throw new InvalidHeaderError('Invalid input format. The input is unknown.');
 
       const info        = first2[1];
-      const version     = info >> 5;
+      const scheme     = info >> 5;
       const saltStrength= ((info >> 2) & 1) ? 'high' : 'low';
-      const saltLen     = VersionRegistry.get(version).saltLengths[saltStrength];
+      const saltLen     = SchemeRegistry.get(scheme).saltLengths[saltStrength];
 
       const header = new Uint8Array(
         await input.slice(0, 2 + saltLen).arrayBuffer(),

@@ -19,12 +19,12 @@ export interface KeyDerivation<D extends string = string> {
 }
 
 /* ---------------------------------------------------------------------
-   Generic descriptor of one “format version”.
+   Generic descriptor of one “format scheme".
 
    S = salt-strength keys  (e.g. "low" | "high")
    D = difficulty presets  (e.g. "low" | "middle" | "high")
 --------------------------------------------------------------------- */
-export interface VersionDescriptor<
+export interface SchemeDescriptor<
   S extends string = string,
   D extends string = string,
 > {

@@ -7,10 +7,10 @@ import { stdin, stdout, stderr, exit as processExit } from 'node:process';
 import { Readable as NodeReadable, Writable as NodeWritable } from 'node:stream';
 import { open as openFile } from 'node:fs/promises';  
 import { createCryptit } from './index.js';
-import { VersionRegistry } from '../../core/src/config/VersionRegistry.js';
+import { SchemeRegistry } from '../../core/src/config/SchemeRegistry.js';
 import { Cryptit } from '../../core/src/index.js';
 
-const PKG_VERSION = '0.2.6'; // sync with root package.json
+const PKG_VERSION = '0.2.7'; // sync with root package.json
 
 async function promptPass(): Promise<string> {
   if (!stdin.isTTY) throw new Error('STDIN not a TTY; use --pass');
@@ -163,9 +163,9 @@ program
     async function decodeBinary(buf: Uint8Array) {
       if (buf.length < 2) throw new Error('Input too short for header');
       const infoByte = buf[1];
-      const version  = infoByte >> 5;
+      const scheme  = infoByte >> 5;
       const strength = ((infoByte >> 2) & 1) ? 'high' : 'low';
-      const saltLen  = VersionRegistry.get(version).saltLengths[strength];
+      const saltLen  = SchemeRegistry.get(scheme).saltLengths[strength];
       const header   = buf.slice(0, 2 + saltLen);
       return Cryptit.headerDecode(header);
     }
@@ -175,9 +175,9 @@ program
       const first2   = Buffer.alloc(2);
       await fd.read(first2, 0, 2, 0);
       const infoByte = first2[1];
-      const version  = infoByte >> 5;
+      const scheme  = infoByte >> 5;
       const strength = ((infoByte >> 2) & 1) ? 'high' : 'low';
-      const saltLen  = VersionRegistry.get(version).saltLengths[strength];
+      const saltLen  = SchemeRegistry.get(scheme).saltLengths[strength];
       const header   = Buffer.alloc(2 + saltLen);
       await fd.read(header, 0, 2 + saltLen, 0);
       await fd.close();
@@ -221,7 +221,7 @@ program
       saltStrength: opts.saltStrength,
       chunkSize: opts.chunkSize,
       verbose: opts.verbose,
-      version: opts.scheme,
+      scheme: opts.scheme,
     });
     const pass =
       opts.pass ??
@@ -271,7 +271,7 @@ program
       saltStrength: opts.saltStrength,
       chunkSize: opts.chunkSize,
       verbose: opts.verbose,
-      version: opts.scheme,
+      scheme: opts.scheme,
     });
     
     const outPath = cmd.out;
@@ -303,7 +303,7 @@ program
       difficulty: opts.difficulty,
       saltStrength: opts.saltStrength,
       verbose: opts.verbose,
-      version: opts.scheme,
+      scheme: opts.scheme,
     });
     const pass =
       opts.pass ??
@@ -325,7 +325,7 @@ program
       difficulty: opts.difficulty,
       saltStrength: opts.saltStrength,
       verbose: opts.verbose,
-      version: opts.scheme,
+      scheme: opts.scheme,
     });
     const pass = opts.pass ?? await promptPass();
     const data = b64 ?? (await readAllFromStdin()).trim();

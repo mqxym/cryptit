@@ -29,8 +29,8 @@
             <input type="password" value="abc" class="form-control" id="secret" placeholder="Enter passphrase">
           </div>
           <div class="col-md-4">
-            <label for="version" class="form-label">Scheme ID (0 - max. 7)</label>
-            <input type="number" min="0" value="0" class="form-control" id="version">
+            <label for="scheme" class="form-label">Scheme ID (0 - max. 7)</label>
+            <input type="number" min="0" value="0" class="form-control" id="scheme">
             <div class="form-text">0 = AES-GCM / Argon2id (single thread)</div>
             <div class="form-text">1 = XChaCha20-Poly1305 / Argon2id (multithread)</div>
           </div>
@@ -89,7 +89,7 @@
     const { createCryptit } = window;
 
     const secretEl       = document.getElementById('secret');
-    const versionEl      = document.getElementById('version');
+    const schemeEl      = document.getElementById('scheme');
     const difficultyEl   = document.getElementById('difficulty');
     const saltStrengthEl = document.getElementById('saltStrength');
     const verboseEl      = document.getElementById('verbose');
@@ -108,7 +108,7 @@
     function getCryptitInstance() {
       clearError();
       return createCryptit({
-        version      : Number(versionEl.value),
+        scheme      : Number(schemeEl.value),
         difficulty   : difficultyEl.value,
         saltStrength : saltStrengthEl.value,
         verbose      : Number(verboseEl.value),

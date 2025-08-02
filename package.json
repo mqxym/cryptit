@@ -1,13 +1,13 @@
 {
     "name": "@mqxym/cryptit",
-    "version": "0.2.6",
+    "version": "0.2.7",
     "type": "module",
     "workspaces": [
         "packages/*"
     ],
     "scripts": {
         "build:dts": "tsc -b",
-        "build": "bun run build:js && bun run build:dts",
+        "build": "bun run build:dts && bun run build:js",
         "build:js": "bun run bun.build.js",
         "dev": "bun build bun.build.js --watch",
         "test": "bun test",

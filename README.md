@@ -6,7 +6,7 @@ Modern, cross-platform **AES-GCM 256 / XChaCha20Poly1305 + Argon2-id** encrypti
 * **Browser (evergreen)** – tiny WASM build of `argon2-browser`
 * **CLI** – stream encryption & decryption, zero memory bloat
 * **TypeScript-first**, tree-shakable, ESM & CJS builds
-* **Format-agnostic decryption** – one instance reads any registered version
+* **Format-agnostic decryption** – one instance reads any registered scheme
 
 ---
 
@@ -90,12 +90,12 @@ await c.decryptText(b64,  pass);
 
 // runtime tweaks
 c.setDifficulty("high");
-c.setScheme(1);           // choose another registered format (version 1 = XChaCha20Poly1305)
+c.setScheme(1);           // choose another registered format (scheme 1 = XChaCha20Poly1305)
 c.setSaltDifficulty("low");
 
 // helpers
 Cryptit.isEncrypted(blobOrB64);          // ↦ boolean
-Cryptit.headerDecode(blobOrB64);         // ↦ meta {version, salt, …}
+Cryptit.headerDecode(blobOrB64);         // ↦ meta {scheme, salt, …}
 ```
 
 Verbose levels:
@@ -105,7 +105,7 @@ Verbose levels:
 | 0     | errors only                   |
 | 1     | +start/finish notices         |
 | 2     | +timings, key-derivation info |
-| 3     | +salt / version / KDF details |
+| 3     | +salt / scheme / KDF details |
 | 4     | wire-level debug              |
 
 ---
@@ -143,7 +143,7 @@ Exit codes: **0** success · **1** any failure (invalid header, auth, I/O …)
 ## Versioned format
 
 * Header: `0x01 | infoByte | salt`
-* Decryptors pick the engine by the header’s version ⇒ **one CLI handles all registered versions**.
+* Decryptors pick the engine by the header’s scheme ⇒ **one CLI handles all registered schemes**.
 
 ---
 
