@@ -12,7 +12,7 @@ import {
   SchemeDescriptor,
 } from './types/index.js';
 import { SchemeRegistry }          from './config/SchemeRegistry.js';
-import { base64Encode, base64Decode, concat } from './util/bytes.js';
+import { base64Encode, base64Decode, concat, secureOverwriteString } from './util/bytes.js';
 import { StreamProcessor }          from './stream/StreamProcessor.js';
 import { EncryptTransform }         from './stream/EncryptTransform.js';
 import { DecryptTransform }         from './stream/DecryptTransform.js';
@@ -213,6 +213,10 @@ export class Cryptit {
       this.log.log(2, 'Deriving key for text encryption');
       const salt = this.genSalt();
       await this.deriveKey(pass, salt);
+      
+      pass = secureOverwriteString(pass);
+      pass = null as any;
+      
       this.log.log(3, `Salt generated: ${base64Encode(salt)}, KDF difficulty: ${this.difficulty}`);
 
       this.log.log(2, 'Encrypting text data');
@@ -246,13 +250,21 @@ export class Cryptit {
       this.log.log(3, 'Start text decoding');
       const data   = base64Decode(b64);
       this.log.log(3, 'Start header decoding');
+
       await Cryptit.peekHeader(b64);
       const hdr    = decodeHeader(data);
+
       this.log.log(3, 'Trying to get engine');
+
       const engine = EngineManager.getEngine(this.provider, hdr.scheme);
+
       this.log.log(2, `Deriving key via engine for scheme: ${hdr.scheme}`);
       this.log.log(3, `Salt use: ${base64Encode(hdr.salt)}, KDF difficulty: ${hdr.difficulty}`);
+
       await EngineManager.deriveKey(engine, pass, hdr.salt, hdr.difficulty);
+      
+      pass = secureOverwriteString(pass);
+      pass = null as any;
 
       this.log.log(2, 'Decrypting text data');
       const plainBytes = await engine.cipher.decryptChunk(
@@ -294,6 +306,9 @@ export class Cryptit {
       const salt = this.genSalt();
       await this.deriveKey(pass, salt);
 
+      pass = secureOverwriteString(pass);
+      pass = null as any;
+
       const header = encodeHeader(this.v.id, this.difficulty, this.saltStrength, salt);
 
       const cipher = await this.stream.collect(
@@ -329,6 +344,9 @@ export class Cryptit {
 
       await EngineManager.deriveKey(engine, pass, parsed.salt, parsed.difficulty);
 
+      pass = secureOverwriteString(pass);
+      pass = null as any;
+
       this.log.log(2, 'Decrypting file data');
       const streamProc = new StreamProcessor(engine.cipher, engine.chunkSize);
       const plain = await streamProc.collect(
@@ -359,6 +377,9 @@ export class Cryptit {
     const salt = this.genSalt();
     await this.deriveKey(pass, salt);
 
+    pass = secureOverwriteString(pass);
+    pass = null as any;
+
     const header = encodeHeader(this.v.id, this.difficulty, this.saltStrength, salt);
     const tf     = this.stream.encryptionStream();
 
@@ -370,11 +391,11 @@ export class Cryptit {
      ────────────────────────────────────────────────────────── */
   /**
    * Create a TransformStream for decrypting incoming ciphertext with header auto-detection.
-   * @param passphrase - Passphrase for key derivation
+   * @param passp - Passphrase for key derivation
    * @returns TransformStream encrypting Uint8Array chunks to Uint8Array plaintext chunks
    */
   async createDecryptionStream(
-    passphrase: string,
+    pass: string,
   ): Promise<TransformStream<Uint8Array, Uint8Array>> {
 
     const self = this;
@@ -410,7 +431,10 @@ export class Cryptit {
           if (buf.length < hdrLen) return;
         
           const engine  = EngineManager.getEngine(self.provider, scheme);
-          await EngineManager.deriveKey(engine, passphrase, salt, difficulty);
+          await EngineManager.deriveKey(engine, pass, salt, difficulty);
+
+          pass = secureOverwriteString(pass);
+          pass = null as any;
 
           downstream = new DecryptTransform(engine.cipher, engine.chunkSize).toTransformStream();
           pipeOut(downstream.readable, ctl);
@@ -458,6 +482,10 @@ export class Cryptit {
     const start = performance.now();
     try {
       const key = await this.kdf.derive(pass, salt, diff, this.provider);
+      
+      pass = secureOverwriteString(pass);
+      pass = null as any;
+      
       await this.cipher.setKey(key);
       this.log.log(3, `Key derivation completed in ${(performance.now() - start).toFixed(1)} ms`);
     } catch (err) {

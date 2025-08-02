@@ -24,7 +24,7 @@ export class XChaCha20Poly1305 implements EncryptionAlgorithm {
     const nonce = this.p.getRandomValues(new Uint8Array(24));
     const cipher = xchacha20poly1305(this.key, nonce);
     const cipherAndTag = cipher.encrypt(plain);
-    // Combine nonce + ciphertext+tag
+    plain.fill(0);
     const out = new Uint8Array(nonce.length + cipherAndTag.length);
     out.set(nonce, 0);
     out.set(cipherAndTag, nonce.length);

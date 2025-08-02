@@ -5,14 +5,14 @@
  *  • Browser     → antelle/argon2-browser (WASM)
  */
 
-import * as Argon2Browser from "argon2-browser";
+import * as Argon2Browser from 'argon2-browser';
 
-import { KeyDerivationError } from "../../errors/index.js";
+import { KeyDerivationError } from '../../errors/index.js';
 
 /** Minimal subset of tuning parameters we expose */
 export interface Argon2Tuning {
-  time: number;        // iterations
-  mem: number;         // kibibytes
+  time: number; // iterations
+  mem: number; // kibibytes
   parallelism: number; // lanes
 }
 
@@ -38,71 +38,65 @@ export async function argon2id(
   password: Uint8Array | string,
   salt: Uint8Array,
   opts: Argon2Tuning,
-  env: "node" | "browser",
+  env: 'node' | 'browser'
 ): Promise<ArgonHash> {
   // ————————————————————————————  Node / Bun  ————————————————————————————
-  if (env === "node") {
-    const argon2 = await import("argon2");
-    const pwdBuf =
-      typeof password === "string" ? Buffer.from(password, "utf8")
-                                   : Buffer.from(password);
+  if (env === 'node') {
+    const argon2 = await import('argon2');
+    const pwdBuf = typeof password === 'string' ? Buffer.from(password, 'utf8') : Buffer.from(password);
 
     const saltBuf = Buffer.from(salt);
 
     const raw: Buffer = await argon2.hash(pwdBuf, {
-      salt       : saltBuf,
-      timeCost    : opts.time,
-      memoryCost  : opts.mem,
-      parallelism : opts.parallelism,
-      hashLength  : 32,
-      raw         : true,
-      type        : argon2.argon2id,
+      salt: saltBuf,
+      timeCost: opts.time,
+      memoryCost: opts.mem,
+      parallelism: opts.parallelism,
+      hashLength: 32,
+      raw: true,
+      type: argon2.argon2id,
     });
+    
+    saltBuf.fill(0);
+    pwdBuf.fill(0);
 
     return { hash: new Uint8Array(raw) };
-
   }
 
   // ————————————————————————————  Browser  ————————————————————————————
-if (env === "browser") {
-  
-    if (!("loadArgon2WasmBinary" in globalThis)) {
-      ;(globalThis as any).loadArgon2WasmBinary = () =>
-        fetch("argon2.wasm")
-          .then(res => {
-            if (!res.ok) throw new Error("Failed to load argon2.wasm");
+  if (env === 'browser') {
+    if (!('loadArgon2WasmBinary' in globalThis)) {
+      (globalThis as any).loadArgon2WasmBinary = () =>
+        fetch('argon2.wasm')
+          .then((res) => {
+            if (!res.ok) throw new Error('Failed to load argon2.wasm');
             return res.arrayBuffer();
           })
-          .then(buf => new Uint8Array(buf));
+          .then((buf) => new Uint8Array(buf));
     }
 
- return Argon2Browser.hash({
-    pass        : password,
-    salt        : salt,
-    time        : opts.time,
-    mem         : opts.mem,
-    parallelism : opts.parallelism,
-    hashLen     : 32,
-    type        : Argon2Browser.ArgonType.Argon2id,
-  })
-  .then((result: Argon2HashResult) => {
-    if (!result || !result.hash) {
-      throw new Error('Failed to produce key derivation');
-    }
-    return { hash: result.hash };
-  })
-  .catch((error: unknown) => {
-    // Narrow the error to extract a message
-    const message =
-      error instanceof Error
-        ? error.message
-        : typeof error === 'string'
-        ? error
-        : 'Unknown error';
+    return Argon2Browser.hash({
+      pass: password,
+      salt: salt,
+      time: opts.time,
+      mem: opts.mem,
+      parallelism: opts.parallelism,
+      hashLen: 32,
+      type: Argon2Browser.ArgonType.Argon2id,
+    })
+      .then((result: Argon2HashResult) => {
+        if (!result || !result.hash) {
+          throw new KeyDerivationError('Failed to produce key derivation');
+        }
+        return { hash: result.hash };
+      })
+      .catch((error: unknown) => {
+        // Narrow the error to extract a message
+        const message = error instanceof Error ? error.message : typeof error === 'string' ? error : 'Unknown error';
 
-    throw new KeyDerivationError(`argon2-browser failure: ${message}`);
-  });
-}
+        throw new KeyDerivationError(`argon2-browser failure: ${message}`);
+      });
+  }
 
   throw new Error(`Unsupported environment: ${env}`);
 }

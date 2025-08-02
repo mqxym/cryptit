@@ -6,6 +6,7 @@ import type {
 } from '../types/index.js';
 import type { CryptoProvider } from '../providers/CryptoProvider.js';
 import { KeyDerivationError } from '../errors/index.js';
+import { secureOverwriteString } from '../util/bytes.js';
 
 export interface Engine {
   desc      : SchemeDescriptor;
@@ -43,6 +44,10 @@ export class EngineManager {
   ): Promise<void> {
     try {
       const key = await engine.kdf.derive(pass, salt, diff as any, engine.provider);
+      
+      pass = secureOverwriteString(pass);
+      pass = null as any;
+      
       await engine.cipher.setKey(key);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

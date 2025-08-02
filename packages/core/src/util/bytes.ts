@@ -64,6 +64,15 @@ export function base64Decode(b64: string): Uint8Array {
   } catch (err: any) {
     const msg = "Base64 Decoding Error";
     throw new DecodingError(msg);
-  }
-  
+  }  
+}
+
+export function secureOverwriteString(str: string): string {
+    const length = str.length;
+    const randomBytes = new Uint8Array(length);
+    crypto.getRandomValues(randomBytes);
+
+    return Array.from(randomBytes, byte =>
+        String.fromCharCode(33 + (byte % 94)) // printable ASCII range
+    ).join('');
 }

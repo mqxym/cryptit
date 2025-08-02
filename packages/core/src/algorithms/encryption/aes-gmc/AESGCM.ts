@@ -15,6 +15,7 @@ export class AESGCM implements EncryptionAlgorithm {
     const cipher = new Uint8Array(
       await this.p.subtle.encrypt({ name: 'AES-GCM', iv }, this.key, plain),
     );
+    plain.fill(0)
     const out = new Uint8Array(iv.length + cipher.length);
     out.set(iv);
     out.set(cipher, iv.length);
@@ -24,7 +25,6 @@ export class AESGCM implements EncryptionAlgorithm {
   async decryptChunk(data: Uint8Array): Promise<Uint8Array> {
     const iv     = data.slice(0, 12);
     const cipher = data.slice(12);
-    const plain  = await this.p.subtle.decrypt({ name: 'AES-GCM', iv }, this.key, cipher);
     try {
       const plain = await this.p.subtle.decrypt(
         { name: 'AES-GCM', iv },
