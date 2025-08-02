@@ -49,6 +49,6 @@
         "./*.wasm": "./dist/browser/*.wasm"
     },
     "bin": {
-        "cryptit": "./dist/bin/cryptit"
+        "cryptit": "./dist/cli/cryptit.cli.js"
     }
 }
