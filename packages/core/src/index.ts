@@ -115,7 +115,7 @@ export class Cryptit {
   }
 
   // ════════════════════════════════════════════════════════════════════════
-  //  PUBLIC  - Informational helpers
+  //  PUBLIC  - Informational helpers
   // ════════════════════════════════════════════════════════════════════════
 
   /**
@@ -155,9 +155,9 @@ export class Cryptit {
   /**
    * Inspect an encrypted payload and return either:
    *   • chunk statistics for file/stream containers
-   *   • IV/nonce & auth‑tag for single‑block text containers
+   *   • IV/nonce & auth -tag for single -block text containers
    *
-   * This never decrypts – it merely parses framing bytes.
+   * This never decrypts - it merely parses framing bytes.
    */
   static async decodeData(
     input: string | Uint8Array | Blob,
@@ -229,7 +229,7 @@ export class Cryptit {
   }
 
   // ════════════════════════════════════════════════════════════════════════
-  //  PUBLIC  - Setters / getters for run-time flexibility
+  //  PUBLIC  - Setters / getters for run-time flexibility
   // ════════════════════════════════════════════════════════════════════════
   /** Set the difficulty level for subsequent operations. */
   setDifficulty(d: Difficulty): void         { this.difficulty = d; }
@@ -576,7 +576,11 @@ export class Cryptit {
           }
 
           downstream = new DecryptTransform(engine.cipher, engine.chunkSize).toTransformStream();
-          pipeOut(downstream.readable, ctl);
+          void pipeOut(downstream.readable, ctl)
+            .catch(err => {
+              // any DecryptionError (or other) will now fault the outer stream
+              ctl.error(err);
+            });
 
           const remainder = buf.slice(hdrLen);
           if (remainder.length) {
@@ -633,7 +637,7 @@ export class Cryptit {
   }
 
   /** Generate a secure random salt according to configured length. */
-  private genSalt(): Uint8Array {
+  private genSalt<S extends SaltStrength>(strength: S = this.saltStrength as S): Uint8Array {
     const len = this.v.saltLengths[this.saltStrength];
     return this.provider.getRandomValues(new Uint8Array(len));
   }

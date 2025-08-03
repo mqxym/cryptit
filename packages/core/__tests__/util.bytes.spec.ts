@@ -29,7 +29,7 @@ describe('util/bytes helpers', () => {
   });
 
   it('throws DecodingError when length is not a multiple of 4', () => {
-    // “Zm8” → 3 characters - illegal padding
+    // “Zm8” → 3 characters - illegal padding
     expect(() => base64Decode('Zm8')).toThrow(DecodingError);
   });
 

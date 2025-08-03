@@ -72,5 +72,5 @@ export function zeroizeString(ref: { value: string }): void {
   /* Overwrite the existing string reference before GC kicks in */
   const len  = ref.value.length;
   const fill = new Array(len).fill('\0').join('');
-  (ref as any).value = fill;            // in‑place overwrite
+  (ref as any).value = fill;            // in -place overwrite
 }

@@ -2,8 +2,8 @@
 import { base64Decode } from './bytes.js';
 
 /**
- * Unified, zero‑copy accessor for Blob | Uint8Array | Base64‑encoded string.
- * Slices are read on‑demand so even multi‑gigabyte Blobs are handled
+ * Unified, zero -copy accessor for Blob | Uint8Array | Base64 -encoded string.
+ * Slices are read on -demand so even multi -gigabyte Blobs are handled
  * without loading them fully into memory.
  */
 export class ByteSource {
@@ -28,18 +28,18 @@ export class ByteSource {
       throw new RangeError('read() slice exceeds data bounds');
     }
 
-    // Uint8Array path – cheapest
+    // Uint8Array path - cheapest
     if (this.src instanceof Uint8Array) {
       return this.src.slice(offset, offset + len);
     }
 
-    // Blob path – use slice() + arrayBuffer()
+    // Blob path - use slice() + arrayBuffer()
     if (this.src instanceof Blob) {
       const buf = await this.src.slice(offset, offset + len).arrayBuffer();
       return new Uint8Array(buf);
     }
 
-    // Base64 text path – decode once then reuse
+    // Base64 text path - decode once then reuse
     return this.ensureUint8().slice(offset, offset + len);
   }
 

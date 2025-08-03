@@ -86,4 +86,37 @@ describe('Cryptit streaming | Scheme 0 encrypt ↔ decrypt pipeline', () => {
     const roundtrip = await collect(rsPlain);
     expect(roundtrip).toEqual(plain);
   });
+
+  it('Scheme 1 stream round -trip with *non -default* chunkSize', async () => {
+  const crypt = new Cryptit(nodeProvider, {
+    chunkSize : 8_000,        // deliberately odd
+    difficulty: 'low',
+    scheme    : 1,
+  });
+
+  const plain = crypto.getRandomValues(new Uint8Array(40_000));
+
+  const { header, writable, readable } = await crypt.createEncryptionStream('pw');
+  const w = writable.getWriter();
+  w.write(plain.slice(0, 10_000));
+  w.write(plain.slice(10_000));
+  w.close();
+
+  const collect = async (rs: ReadableStream<Uint8Array>) => {
+    const rd = rs.getReader(); const out: Uint8Array[] = [];
+    for (;;) { const { done, value } = await rd.read(); if (done) break; out.push(value); }
+    return Uint8Array.from(out.flatMap(c => [...c]));
+  };
+
+  const body   = await collect(readable);
+  const cipher = new Uint8Array(header.length + body.length);
+  cipher.set(header); cipher.set(body, header.length);
+
+  const decTs = await crypt.createDecryptionStream('pw');
+  const round = await collect(
+    new ReadableStream<Uint8Array>({ start(c) { c.enqueue(cipher); c.close(); } })
+      .pipeThrough(decTs),
+  );
+  expect(round).toEqual(plain);
+});
 });

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // packages/node-runtime/src/cli.ts
 import { Command, Option } from 'commander';
-import { existsSync, accessSync, constants as fsConstants} from 'node:fs';
+import { existsSync, accessSync, constants as fsConstants, realpathSync, realpath} from 'node:fs';
 import { createReadStream, createWriteStream } from 'node:fs';
 import { stdin, stdout, stderr, exit as processExit } from 'node:process';
 import { Readable as NodeReadable, Writable as NodeWritable } from 'node:stream';
@@ -49,14 +49,18 @@ async function promptPass(): Promise<string> {
 function assertWritable(out: string, root: string = DEFAULT_ROOT) {
   if (out === '-') return;
 
-  const absRoot = resolve(root);
-  const absOut  = isAbsolute(out) ? resolve(out) : resolve(absRoot, out);
+  const absRoot    = realpathSync(root);
 
-  if (!absOut.startsWith(absRoot + sep)) {
-    throw new Error("Refusing to write outside of root directory.");
+ const absOut     = isAbsolute(out)
+                     ? resolve(out)
+                    : resolve(absRoot, out);
+
+  const targetDir  = dirname(absOut);
+  const realTarget = realpathSync(targetDir);
+
+  if (!realTarget.startsWith(absRoot + sep)) {
+    throw new Error('Refusing to write outside of root directory.');
   }
-
-  const targetDir = dirname(absOut);
   if (!existsSync(targetDir)) {
     throw new Error(`Output directory does not exist: ${targetDir}`);
   }
