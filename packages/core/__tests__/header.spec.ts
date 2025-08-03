@@ -32,4 +32,12 @@ describe('header encode/decode - extra cases', () => {
     const bad = encodeHeader(7, 'low', 'low', salt);   // id 7 is unregistered
     expect(() => decodeHeader(bad)).toThrow(HeaderDecodeError);
   });
+
+  it('throws InvalidHeaderError when header is too short', () => {
+    // Minimum header is 2 bytes + 12-byte salt = 14 bytes
+    const tooShort = new Uint8Array(13)
+    tooShort[0] = 0x01;
+    expect(() => decodeHeader(tooShort)).toThrow(InvalidHeaderError);
+    expect(() => decodeHeader(tooShort)).toThrow('Invalid input format. Header too short.');
+  });
 });

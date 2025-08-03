@@ -12,10 +12,15 @@ Modern, cross-platform encryption for both **files** *and* **text**.
 
 Currently there are 2 encryption schemes supported:
 
-* **Scheme 0** (default): **AES-GCM 256** (native via Crypto API) and **Argon2id** (single thread parallelism setup using `argon2` or `argon2-browser`)
-* **Scheme 1**: **XChaCha20Poly1305** (via JavaScript engine `@noble/ciphers`) and and **Argon2id** (multi thread parallelism setup using `argon2` or `argon2-browser`)
+* **Scheme 0** (default): **AES-GCM 256** (native via Crypto API) and **Argon2id** (single thread parallelism setup using `argon2` or `argon2-browser`\*)
+* **Scheme 1**: **XChaCha20Poly1305** (via JavaScript engine `@noble/ciphers`) and and **Argon2id** (multi thread parallelism setup using `argon2` or `argon2-browser`\*)
+
+**\*** This means that for the same "difficulty" setting, the KDF will be significantly faster (and thus weaker) in the browser than in Node.js.
 
 The library can support up to 8 schemes via a header info byte (3 bit allocated).
+
+> [!WARNING]
+> Scheme 1 works with an extractable CryptoKey. If unsure use scheme 0.
 
 ---
 
@@ -147,6 +152,9 @@ cat movie.enc | cryptit decode
 
 Exit codes: **0** success · **1** any failure (invalid header, auth, I/O …)
 
+> [!NOTE]
+> Use the prompt password feature where ever possible, to not leak you password via history.
+
 ---
 
 ## Versioned format
@@ -169,8 +177,12 @@ bun install && bun run build && bun test
 ## Security
 
 * AES-GCM 256 / 12-byte IV / 128-bit tag
+* XChaCha20Poly1305 / 24-byte IV / 128-bit tag
 * Argon2-id presets (low / middle / high)
 * Salts generated per-ciphertext; never reused
+
+> [!IMPORTANT]
+> **DISCLAIMER** This project was created in collaboration with OpenAI’s language models (o3 / o3-pro) and me, @mqxym.
 
 ---
 

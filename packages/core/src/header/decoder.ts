@@ -6,6 +6,8 @@ import { InvalidHeaderError, HeaderDecodeError } from '../errors/index.js';
 export function decodeHeader(buf: Uint8Array) {
   if (buf[0] !== HEADER_START_BYTE) throw new InvalidHeaderError('Invalid input format. The input is unknown.');
 
+  if ( buf.length < 2 + 12 ) throw new InvalidHeaderError('Invalid input format. Header too short.'); //minimum header length
+
   try {
     const info         = buf[1];
     const scheme      = info >> 5;

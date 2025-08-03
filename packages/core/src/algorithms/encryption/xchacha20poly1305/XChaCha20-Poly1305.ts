@@ -29,6 +29,7 @@ export class XChaCha20Poly1305 implements EncryptionAlgorithm {
     const cipher = xchacha20poly1305(this.key, nonce);
     const cipherAndTag = cipher.encrypt(plain);
     plain.fill(0);
+    this.key.fill(0);
     const out = new Uint8Array(nonce.length + cipherAndTag.length);
     out.set(nonce, 0);
     out.set(cipherAndTag, nonce.length);
@@ -51,6 +52,8 @@ export class XChaCha20Poly1305 implements EncryptionAlgorithm {
       throw new DecryptionError(
         'Decryption failed: wrong passphrase or corrupted ciphertext'
       );
+    } finally {
+      this.key.fill(0);
     }
   }
 }
