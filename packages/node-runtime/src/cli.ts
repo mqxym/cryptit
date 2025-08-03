@@ -10,7 +10,7 @@ import { createCryptit } from './index.js';
 import { Cryptit } from '../../core/src/index.js';
 import { dirname } from 'node:path';
 
-const PKG_VERSION = '0.2.11'; // sync with root package.json
+const PKG_VERSION = '0.2.12'; // sync with root package.json
 
 async function promptPass(): Promise<string> {
   if (!stdin.isTTY) throw new Error('STDIN not a TTY; use --pass');
