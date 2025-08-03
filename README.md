@@ -13,7 +13,7 @@ Modern, cross-platform encryption for both **files** *and* **text**.
 Currently there are 2 encryption schemes supported:
 
 * **Scheme 0** (default): **AES-GCM 256** (native via Crypto API) and **Argon2id** (single thread parallelism setup using `argon2` or `argon2-browser`)
-* **Scheme 1**: **XChaCha20Poly1305** (via JavaScript engine `@noble/cipehrs`) and and **Argon2id** (multi thread parallelism setup using `argon2` or `argon2-browser`)
+* **Scheme 1**: **XChaCha20Poly1305** (via JavaScript engine `@noble/ciphers`) and and **Argon2id** (multi thread parallelism setup using `argon2` or `argon2-browser`)
 
 The library can support up to 8 schemes via a header info byte (3 bit allocated).
 
@@ -72,7 +72,7 @@ await createReadStream("movie.enc")
 <script type="module">
   import { createCryptit } from "@mqxym/cryptit/browser";
 
-  // IMPORTANT: host argon2.wasm at /dist/argon2.wasm (relative to final HTML)
+  // IMPORTANT: host argon2.wasm at /argon2.wasm (relative to final HTML)
 
   const crypt = createCryptit({ saltStrength: "high", verbose: 2 });
 
