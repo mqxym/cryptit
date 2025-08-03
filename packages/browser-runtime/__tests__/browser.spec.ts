@@ -18,11 +18,11 @@ describe('browser-runtime facade', () => {
 });
 
 describe('browser-runtime scheme 1', () => {
-  const crypt = createCryptit({ chunkSize: 1024, scheme: 1 });
+  const crypt1 = createCryptit({ difficulty: "low", saltStrength: "low", scheme: 1 });
 
   it('encrypts & decrypts in a browser context', async () => {
-    const cipher = await crypt.encryptText('Foo', 'pw');
-    const plain  = await crypt.decryptText(cipher, 'pw');
+    const cipher = await crypt1.encryptText('Foo', 'pw');
+    const plain  = await crypt1.decryptText(cipher, 'pw');
     expect(plain).toBe('Foo');
   });
 });
