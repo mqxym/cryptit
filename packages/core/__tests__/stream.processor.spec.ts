@@ -1,18 +1,21 @@
 import { StreamProcessor }      from '../src/stream/StreamProcessor.js';
 import type { EncryptionAlgorithm } from '../src/types/index.js';
 
-class Rot1Engine implements EncryptionAlgorithm {
+class FakeEngine implements EncryptionAlgorithm {
   async encryptChunk(p: Uint8Array) {
     return Uint8Array.from(p, v => (v + 1) & 0xFF);
   }
   async decryptChunk(c: Uint8Array) {
     return Uint8Array.from(c, v => (v - 1) & 0xFF);
   }
+  async setKey(k: CryptoKey): Promise<void> { }
+  zeroKey(): void { }
+  IV_LENGTH: number;
 }
 
 describe('StreamProcessor.collect', () => {
   it('collects with prefix', async () => {
-    const engine = new Rot1Engine();
+    const engine = new FakeEngine();
     const sp     = new StreamProcessor(engine, 8);
 
     const plain  = new Uint8Array([1, 2, 3, 4]);

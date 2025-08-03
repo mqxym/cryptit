@@ -5,6 +5,7 @@ export interface EncryptionAlgorithm {
   encryptChunk(plain : Uint8Array): Promise<Uint8Array>;
   decryptChunk(cipher: Uint8Array): Promise<Uint8Array>;
   setKey(k: CryptoKey): Promise<void>;
+  zeroKey(): void;
   readonly IV_LENGTH: number;
 }
 

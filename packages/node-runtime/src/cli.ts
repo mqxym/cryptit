@@ -1,16 +1,19 @@
 #!/usr/bin/env node
 // packages/node-runtime/src/cli.ts
 import { Command, Option } from 'commander';
-import { existsSync } from 'node:fs';
+import { existsSync, accessSync, constants as fsConstants} from 'node:fs';
 import { createReadStream, createWriteStream } from 'node:fs';
 import { stdin, stdout, stderr, exit as processExit } from 'node:process';
 import { Readable as NodeReadable, Writable as NodeWritable } from 'node:stream';
 import { open as openFile } from 'node:fs/promises';  
 import { createCryptit } from './index.js';
 import { Cryptit } from '../../core/src/index.js';
-import { dirname } from 'node:path';
+import { dirname , resolve, sep, isAbsolute} from 'node:path';
+
 
 const PKG_VERSION = '0.2.12'; // sync with root package.json
+
+const DEFAULT_ROOT = process.cwd();
 
 async function promptPass(): Promise<string> {
   if (!stdin.isTTY) throw new Error('STDIN not a TTY; use --pass');
@@ -42,10 +45,30 @@ async function promptPass(): Promise<string> {
 }
 
 
-function assertWritable(out: string) {
+
+function assertWritable(out: string, root: string = DEFAULT_ROOT) {
   if (out === '-') return;
-  const dir = dirname(out);
-  if (!existsSync(dir)) throw new Error(`Output directory does not exist: ${dir}`);
+
+  const absRoot = resolve(root);
+  const absOut  = isAbsolute(out) ? resolve(out) : resolve(absRoot, out);
+
+  if (!absOut.startsWith(absRoot + sep)) {
+    throw new Error("Refusing to write outside of root directory.");
+  }
+
+  const targetDir = dirname(absOut);
+  if (!existsSync(targetDir)) {
+    throw new Error(`Output directory does not exist: ${targetDir}`);
+  }
+
+  try {
+    accessSync(targetDir, fsConstants.W_OK);
+  } catch {
+    throw new Error(`Output directory is not writeable`);
+  }
+  
+
+  return absOut;
 }
 
 function nodeToWeb(reader: typeof stdin | import('node:fs').ReadStream) {

@@ -6,6 +6,8 @@ class EchoEngine implements EncryptionAlgorithm {
   async encryptChunk(p: Uint8Array) { return p; }
   async decryptChunk(c: Uint8Array) { return c; }
   async setKey (k: CryptoKey) {}
+  IV_LENGTH: number;
+  zeroKey(): void {}
 }
 
 async function collect<T extends Uint8Array>(rs: ReadableStream<T>) {

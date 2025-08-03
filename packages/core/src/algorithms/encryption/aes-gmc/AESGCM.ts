@@ -11,9 +11,9 @@ export class AESGCM implements EncryptionAlgorithm {
 
   constructor(private readonly p: CryptoProvider) {}
 
-  async setKey(k: CryptoKey) { this.key = k; }
+  public async setKey(k: CryptoKey) { this.key = k; }
 
-  async encryptChunk(plain: Uint8Array): Promise<Uint8Array> {
+  public async encryptChunk(plain: Uint8Array): Promise<Uint8Array> {
     
     const iv = this.p.getRandomValues(
       new Uint8Array(AESGCM.IV_LENGTH),
@@ -29,7 +29,7 @@ export class AESGCM implements EncryptionAlgorithm {
     return out;
   }
 
-  async decryptChunk(data: Uint8Array): Promise<Uint8Array> {
+  public async decryptChunk(data: Uint8Array): Promise<Uint8Array> {
     const iv     = data.slice(0, AESGCM.IV_LENGTH);
     const cipher = data.slice(AESGCM.IV_LENGTH);
     try {
@@ -45,4 +45,6 @@ export class AESGCM implements EncryptionAlgorithm {
       );
     }
   }
+
+  public zeroKey() {}
 }

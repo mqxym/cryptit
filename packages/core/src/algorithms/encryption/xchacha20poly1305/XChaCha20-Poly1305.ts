@@ -15,7 +15,7 @@ export class XChaCha20Poly1305 implements EncryptionAlgorithm {
   /**
    * Export the raw key material for use with @noble/ciphers
    */
-  async setKey(k: CryptoKey) {
+  public async setKey(k: CryptoKey) {
     this.key = new Uint8Array(await this.p.subtle.exportKey('raw', k));
   }
 
@@ -24,12 +24,11 @@ export class XChaCha20Poly1305 implements EncryptionAlgorithm {
    * - Generates a 24-byte nonce
    * - Prepends nonce to ciphertext || tag
    */
-  async encryptChunk(plain: Uint8Array): Promise<Uint8Array> {
+  public async encryptChunk(plain: Uint8Array): Promise<Uint8Array> {
     const nonce = this.p.getRandomValues(new Uint8Array(XChaCha20Poly1305.IV_LENGTH));
     const cipher = xchacha20poly1305(this.key, nonce);
     const cipherAndTag = cipher.encrypt(plain);
     plain.fill(0);
-    this.key.fill(0);
     const out = new Uint8Array(nonce.length + cipherAndTag.length);
     out.set(nonce, 0);
     out.set(cipherAndTag, nonce.length);
@@ -42,7 +41,7 @@ export class XChaCha20Poly1305 implements EncryptionAlgorithm {
    * - Decrypts ciphertext || tag
    * - Throws on authentication failure
    */
-  async decryptChunk(data: Uint8Array): Promise<Uint8Array> {
+  public async decryptChunk(data: Uint8Array): Promise<Uint8Array> {
     const nonce = data.slice(0, XChaCha20Poly1305.IV_LENGTH);
     const cipherAndTag = data.slice(XChaCha20Poly1305.IV_LENGTH);
     const cipher = xchacha20poly1305(this.key, nonce);
@@ -52,8 +51,10 @@ export class XChaCha20Poly1305 implements EncryptionAlgorithm {
       throw new DecryptionError(
         'Decryption failed: wrong passphrase or corrupted ciphertext'
       );
-    } finally {
-      this.key.fill(0);
     }
+  }
+
+  public zeroKey(): void {
+    this.key.fill(0);
   }
 }

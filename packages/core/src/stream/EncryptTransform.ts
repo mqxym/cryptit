@@ -71,6 +71,8 @@ export class EncryptTransform {
 
     ctl.enqueue(out);
     this.buffer = new Uint8Array(0);
+
+    this.engine.zeroKey();
   }
 
   private async asUint8Array(

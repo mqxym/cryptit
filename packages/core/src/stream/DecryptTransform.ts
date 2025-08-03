@@ -71,6 +71,7 @@ export class DecryptTransform {
   private async flush(ctl: TransformStreamDefaultController<Uint8Array>) {
     await this.transform(new Uint8Array(0), ctl);
     this.buffer = new Uint8Array(0);
+    this.engine.zeroKey();
   }
 
   private async asUint8Array(

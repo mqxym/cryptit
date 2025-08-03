@@ -105,7 +105,7 @@ export class Cryptit {
     this.v          = SchemeRegistry.get(opt.scheme ?? SchemeRegistry.current.id);
     this.cipher     = new this.v.cipher(provider);
     this.kdf        = this.v.kdf;
-    this.chunkSize  = opt.chunkSize ?? this.v.defaultChunkSize;
+    this.chunkSize  = this.setChunkSize(opt.chunkSize ?? this.v.defaultChunkSize);
     this.stream     = new StreamProcessor(this.cipher, this.chunkSize);
 
     this.difficulty     = opt.difficulty   ?? 'middle';
@@ -263,9 +263,26 @@ export class Cryptit {
    * Configure chunk size (bytes) for streaming transforms.
    * @param bytes - Desired chunk size in bytes
    */
-  setChunkSize(bytes: number): void {
-    this.chunkSize = bytes;
+  setChunkSize(bytes: number): number {
+     
+    const rawSize = bytes;
+    let size: number;
+
+    if (rawSize == null) {
+      size = this.v.defaultChunkSize;
+    } else {
+      size = Number(rawSize);
+      if (!Number.isInteger(size) || size < 1) {
+        throw new Error(
+          `Invalid chunkSize: ${rawSize}. Must be a positive integer.`
+        );
+      }
+    }
+
+    // finally assign
+    this.chunkSize = size;
     this.stream    = new StreamProcessor(this.cipher, this.chunkSize);
+    return size;
   }
   /** Retrieve the current streaming chunk size. */
   getChunkSize(): number                     { return this.chunkSize; }
@@ -307,6 +324,7 @@ export class Cryptit {
       const cipher = await this.cipher.encryptChunk(
         typeof plain === 'string' ? new TextEncoder().encode(plain) : plain,
       );
+      this.cipher.zeroKey();
       this.log.log(3, 'Encoding header');
       const header = encodeHeader(this.v.id, this.difficulty, this.saltStrength, salt);
       this.log.log(3, 'Encoding text');
@@ -357,6 +375,7 @@ export class Cryptit {
       const plainBytes = await engine.cipher.decryptChunk(
         data.slice(hdr.headerLen),
       );
+      engine.cipher.zeroKey();
       this.log.log(3, 'Decoding text');
       const text = new TextDecoder().decode(plainBytes);
       this.log.log(1, 'Decryption finished');
