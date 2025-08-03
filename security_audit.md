@@ -1,4 +1,4 @@
-# Security Audit Report for @mqxym/cryptit
+# Security Audit Report for @mqxym/cryptit 0.2.12
 
 This document presents a detailed security audit of the `@mqxym/cryptit` project. The audit was conducted by SecuAI, following a comprehensive security checklist.
 
