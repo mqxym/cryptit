@@ -36,3 +36,7 @@ export interface SchemeDescriptor<
   readonly difficulties : Record<D, unknown>;                   // free-form KDF presets
   readonly defaultChunkSize: number;
 }
+
+export type Secret = {
+  value: string;
+};

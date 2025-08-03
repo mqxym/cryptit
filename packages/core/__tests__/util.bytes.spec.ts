@@ -27,8 +27,13 @@ describe('util/bytes helpers', () => {
   it('rejects Base64 containing **whitespace**', () => {
     expect(() => base64Decode('Zm8 g')).toThrow(DecodingError);
   });
-});
 
-/* ------------------------------------------------------------------ */
-/*  Strict Base64 validation                                          */
-/* ------------------------------------------------------------------ */
+  it('throws DecodingError when length is not a multiple of 4', () => {
+    // “Zm8” → 3 characters - illegal padding
+    expect(() => base64Decode('Zm8')).toThrow(DecodingError);
+  });
+
+  it('throws DecodingError when input contains non-alphabet characters', () => {
+    expect(() => base64Decode('YWJj$A==')).toThrow(DecodingError);
+  });
+});

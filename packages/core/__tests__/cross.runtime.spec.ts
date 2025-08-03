@@ -28,4 +28,11 @@ describe('cryptit CLI ↔ browser-runtime', () => {
     const plain  = await crypt.decryptText(cipher, 'pw');
     expect(plain).toBe('interop');
   });
+
+  it('browser encrypt → `decrypt-text` (CLI)', async () => {
+    const crypt  = new Cryptit(browserProvider as CryptoProvider);
+    const cipher = await crypt.encryptText('cli-roundtrip', 'pw');
+    const plain  = await runCli(['decrypt-text', cipher, '--pass', 'pw']);
+    expect(plain).toBe('cli-roundtrip');
+  });
 });

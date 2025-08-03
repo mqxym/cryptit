@@ -31,6 +31,9 @@ export class EncryptTransform {
     bytes: Uint8Array,
     ctl: TransformStreamDefaultController<Uint8Array>,
   ) {
+    if (bytes.length > this.chunkSize * 4) {
+      throw new RangeError(`Input block (${bytes.length} B) exceeds sane limit`);
+    }
     const combined = new Uint8Array(this.buffer.length + bytes.length);
     combined.set(this.buffer);
     combined.set(bytes, this.buffer.length);

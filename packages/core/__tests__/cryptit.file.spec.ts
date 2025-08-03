@@ -7,7 +7,19 @@ const randomBlob = (bytes: number) =>
 describe('Cryptit file helpers', () => {
   const crypt = new Cryptit(nodeProvider);
 
-  it('round-trips a 2 MiB Blob loss-lessly', async () => {
+  it('round-trips a 2 MiB Blob loss-lessly', async () => {
+    const plain = randomBlob(2_097_152);      // 2 MiB
+    const enc   = await crypt.encryptFile(plain, 'hunter2');
+    const dec   = await crypt.decryptFile(enc, 'hunter2');
+
+    expect(await dec.arrayBuffer()).toEqual(await plain.arrayBuffer());
+  });
+});
+
+describe('Cryptit file helpers | Scheme 1', () => {
+  const crypt = new Cryptit(nodeProvider, {scheme: 1} );
+
+  it('round-trips a 2 MiB Blob loss-lessly', async () => {
     const plain = randomBlob(2_097_152);      // 2 MiB
     const enc   = await crypt.encryptFile(plain, 'hunter2');
     const dec   = await crypt.decryptFile(enc, 'hunter2');

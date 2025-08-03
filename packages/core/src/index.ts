@@ -10,9 +10,10 @@ import {
   EncryptionAlgorithm,
   KeyDerivation,
   SchemeDescriptor,
+  Secret
 } from './types/index.js';
 import { SchemeRegistry }          from './config/SchemeRegistry.js';
-import { base64Encode, base64Decode, concat, secureOverwriteString } from './util/bytes.js';
+import { base64Encode, base64Decode, concat, zeroizeString } from './util/bytes.js';
 import { StreamProcessor }          from './stream/StreamProcessor.js';
 import { EncryptTransform }         from './stream/EncryptTransform.js';
 import { DecryptTransform }         from './stream/DecryptTransform.js';
@@ -208,13 +209,15 @@ export class Cryptit {
    * @throws EncryptionError on failure
    */
   async encryptText(plain: string | Uint8Array, pass: string): Promise<string> {
+    const secret = { value: pass };
+
     try {
       this.log.log(1, `Start text encryption, scheme: ${this.getScheme()}`);
       this.log.log(2, 'Deriving key for text encryption');
       const salt = this.genSalt();
-      await this.deriveKey(pass, salt);
+      await this.deriveKey(secret, salt);
       
-      pass = secureOverwriteString(pass);
+      zeroizeString(secret);
       pass = null as any;
       
       this.log.log(3, `Salt generated: ${base64Encode(salt)}, KDF difficulty: ${this.difficulty}`);
@@ -245,6 +248,7 @@ export class Cryptit {
    * @throws DecryptionError on failure or invalid header
    */
   async decryptText(b64: string, pass: string): Promise<string> {
+    const secret = { value: pass };
     try {
       this.log.log(1, `Start text decryption, Version ${this.getScheme()}`);
       this.log.log(3, 'Start text decoding');
@@ -260,11 +264,13 @@ export class Cryptit {
 
       this.log.log(2, `Deriving key via engine for scheme: ${hdr.scheme}`);
       this.log.log(3, `Salt use: ${base64Encode(hdr.salt)}, KDF difficulty: ${hdr.difficulty}`);
-
-      await EngineManager.deriveKey(engine, pass, hdr.salt, hdr.difficulty);
       
-      pass = secureOverwriteString(pass);
-      pass = null as any;
+      try {
+        await EngineManager.deriveKey(engine, secret, hdr.salt, hdr.difficulty);
+      } finally {
+        zeroizeString(secret);
+         pass = null as any;
+      }
 
       this.log.log(2, 'Decrypting text data');
       const plainBytes = await engine.cipher.decryptChunk(
@@ -301,13 +307,14 @@ export class Cryptit {
    * @throws EncryptionError on failure
    */
   async encryptFile(file: Blob, pass: string): Promise<Blob> {
+    const secret = { value: pass };
     try {
 
       if (file.size === 0) {
         const salt = this.genSalt();
-        await this.deriveKey(pass, salt);
+        await this.deriveKey(secret, salt);
 
-        pass = secureOverwriteString(pass);
+        zeroizeString(secret);
         pass = null as any;
 
         const header = encodeHeader(
@@ -321,9 +328,9 @@ export class Cryptit {
       }
       this.log.log(2, 'Deriving key for file encryption');
       const salt = this.genSalt();
-      await this.deriveKey(pass, salt);
+      await this.deriveKey(secret, salt);
 
-      pass = secureOverwriteString(pass);
+      zeroizeString(secret);
       pass = null as any;
 
       const header = encodeHeader(this.v.id, this.difficulty, this.saltStrength, salt);
@@ -354,15 +361,18 @@ export class Cryptit {
    * @throws DecryptionError on failure or invalid header
    */
   async decryptFile(file: Blob, pass: string): Promise<Blob> {
+    const secret = { value: pass };
     try {
       const header = await Cryptit.peekHeader(file);
       const parsed = decodeHeader(header);
       const engine = EngineManager.getEngine(this.provider, parsed.scheme);
 
-      await EngineManager.deriveKey(engine, pass, parsed.salt, parsed.difficulty);
-
-      pass = secureOverwriteString(pass);
-      pass = null as any;
+      try {
+        await EngineManager.deriveKey(engine, secret, parsed.salt, parsed.difficulty);
+      } finally {
+        zeroizeString(secret);
+        pass = null as any;
+      }
 
       // ── 0-byte optimisation ────────────────────────────────────────
       if (file.size === parsed.headerLen) {
@@ -396,11 +406,13 @@ export class Cryptit {
    * @returns Streams and header for real-time encryption
    */
   async createEncryptionStream(pass: string): Promise<EncryptStreamResult> {
+    const secret = { value: pass };
+
     this.log.log(2, 'Deriving key for stream encryption');
     const salt = this.genSalt();
-    await this.deriveKey(pass, salt);
+    await this.deriveKey(secret, salt);
 
-    pass = secureOverwriteString(pass);
+    zeroizeString(secret);
     pass = null as any;
 
     const header = encodeHeader(this.v.id, this.difficulty, this.saltStrength, salt);
@@ -420,6 +432,7 @@ export class Cryptit {
   async createDecryptionStream(
     pass: string,
   ): Promise<TransformStream<Uint8Array, Uint8Array>> {
+    const secret = { value: pass };
 
     const self = this;
     let   buf: Uint8Array<ArrayBufferLike>  = new Uint8Array(0);
@@ -454,10 +467,13 @@ export class Cryptit {
           if (buf.length < hdrLen) return;
         
           const engine  = EngineManager.getEngine(self.provider, scheme);
-          await EngineManager.deriveKey(engine, pass, salt, difficulty);
 
-          pass = secureOverwriteString(pass);
-          pass = null as any;
+          try {
+            await EngineManager.deriveKey(engine, secret, salt, difficulty);
+          } finally {
+            zeroizeString(secret);
+            pass = null as any;
+          }
 
           downstream = new DecryptTransform(engine.cipher, engine.chunkSize).toTransformStream();
           pipeOut(downstream.readable, ctl);
@@ -498,16 +514,14 @@ export class Cryptit {
    * @throws KeyDerivationError on KDF failure
    */
   private async deriveKey(
-    pass: string,
+    secret: Secret,
     salt: Uint8Array,
     diff: Difficulty = this.difficulty,
   ): Promise<void> {
     const start = performance.now();
     try {
-      const key = await this.kdf.derive(pass, salt, diff, this.provider);
-      
-      pass = secureOverwriteString(pass);
-      pass = null as any;
+      const key = await this.kdf.derive(secret.value, salt, diff, this.provider);
+      zeroizeString(secret);
       
       await this.cipher.setKey(key);
       this.log.log(3, `Key derivation completed in ${(performance.now() - start).toFixed(1)} ms`);
@@ -533,41 +547,26 @@ export class Cryptit {
    * @returns Uint8Array slice of the header bytes
    * @throws HeaderDecodeError or InvalidHeaderError on invalid input
    */
-  private static async peekHeader(
-    input: string | Uint8Array | Blob,
-  ): Promise<Uint8Array> {
-    // Handle Base64 text input
-    if (typeof input === 'string') {
-      input = base64Decode(input);
-    }
+
+  private static async peekHeader(input: string | Uint8Array | Blob) {
+    const buf = await this.readAsUint8(input);
 
     // Handle raw Uint8Array input
-    if (input instanceof Uint8Array) {
-      if (input.length < 2) throw new InvalidHeaderError('Input too short');
+    if (buf instanceof Uint8Array) {
+      if (buf.length < 2) throw new InvalidHeaderError('Input too short');
       const { headerLen } = decodeHeader(
-        input.length >= 16 ? input : Uint8Array.from(input),
+        buf.length >= 16 ? buf : Uint8Array.from(buf),
       );
-      if (input.length < headerLen) throw new InvalidHeaderError('Incomplete header');
-      return input.slice(0, headerLen);
+      if (buf.length < headerLen) throw new InvalidHeaderError('Incomplete header');
+      return buf.slice(0, headerLen);
     }
+    throw new HeaderDecodeError('Unsupported input type');
+  }
 
-    // Handle Blob/File input
-    if (input instanceof Blob) {
-      const first2 = new Uint8Array(await input.slice(0, 2).arrayBuffer());
-      if (first2[0] !== 0x01) throw new InvalidHeaderError('Invalid input format. The input is unknown.');
-
-      const info        = first2[1];
-      const scheme     = info >> 5;
-      const saltStrength= ((info >> 2) & 1) ? 'high' : 'low';
-      const saltLen     = SchemeRegistry.get(scheme).saltLengths[saltStrength];
-
-      const header = new Uint8Array(
-        await input.slice(0, 2 + saltLen).arrayBuffer(),
-      );
-      decodeHeader(header); // validate header contents
-      return header;
-    }
-
+  private static async readAsUint8(input: string | Uint8Array | Blob): Promise<Uint8Array> {
+    if (typeof input === 'string')      return base64Decode(input);
+    if (input instanceof Uint8Array)    return input;
+    if (input instanceof Blob)          return new Uint8Array(await input.arrayBuffer());
     throw new HeaderDecodeError('Unsupported input type');
   }
 }

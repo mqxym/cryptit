@@ -9,8 +9,9 @@ import { open as openFile } from 'node:fs/promises';
 import { createCryptit } from './index.js';
 import { SchemeRegistry } from '../../core/src/config/SchemeRegistry.js';
 import { Cryptit } from '../../core/src/index.js';
+import { dirname } from 'node:path';
 
-const PKG_VERSION = '0.2.9'; // sync with root package.json
+const PKG_VERSION = '0.2.10'; // sync with root package.json
 
 async function promptPass(): Promise<string> {
   if (!stdin.isTTY) throw new Error('STDIN not a TTY; use --pass');
@@ -39,6 +40,13 @@ async function promptPass(): Promise<string> {
     }
     stdin.on('data', onData);
   });
+}
+
+
+function assertWritable(out: string) {
+  if (out === '-') return;
+  const dir = dirname(out);
+  if (!existsSync(dir)) throw new Error(`Output directory does not exist: ${dir}`);
 }
 
 function nodeToWeb(reader: typeof stdin | import('node:fs').ReadStream) {
@@ -230,11 +238,14 @@ program
         processExit(1);
       })());
     
-    const outPath = cmd.out;
-    if (outPath !== '-' && !existsSync(outPath) && !existsSync(require('path').dirname(outPath))) {
-      stderr.write(`Error: output directory does not exist: ${require('path').dirname(outPath)}\n`);
+
+    try {
+      assertWritable(cmd.out);
+    } catch (err: any) {
+      stderr.write(`Error: ${err.message}\n`);
       processExit(1);
     }
+
     const inStream  = src  === '-' ? stdin  : createReadStream(src);
     const outStream = cmd.out === '-' ? stdout : createWriteStream(cmd.out);
 
@@ -273,12 +284,14 @@ program
       verbose: opts.verbose,
       scheme: opts.scheme,
     });
-    
-    const outPath = cmd.out;
-    if (outPath !== '-' && !existsSync(outPath) && !existsSync(require('path').dirname(outPath))) {
-      stderr.write(`Error: output directory does not exist: ${require('path').dirname(outPath)}\n`);
+
+    try {
+      assertWritable(cmd.out);
+    } catch (err: any) {
+      stderr.write(`Error: ${err.message}\n`);
       processExit(1);
     }
+
 
     const pass = opts.pass ?? await promptPass();
     const inStream  = src  === '-' ? stdin  : createReadStream(src);

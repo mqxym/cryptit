@@ -3,10 +3,11 @@ import type {
   SchemeDescriptor,
   EncryptionAlgorithm,
   KeyDerivation,
+  Secret,
 } from '../types/index.js';
 import type { CryptoProvider } from '../providers/CryptoProvider.js';
 import { KeyDerivationError } from '../errors/index.js';
-import { secureOverwriteString } from '../util/bytes.js';
+import { zeroizeString } from '../util/bytes.js';
 
 export interface Engine {
   desc      : SchemeDescriptor;
@@ -43,15 +44,14 @@ export class EngineManager {
 
   static async deriveKey(
     engine : Engine,
-    pass   : string,
+    secret   : Secret,
     salt   : Uint8Array,
     diff   : string,
   ): Promise<void> {
     try {
-      const key = await engine.kdf.derive(pass, salt, diff as any, engine.provider);
+      const key = await engine.kdf.derive(secret.value, salt, diff as any, engine.provider);
       
-      pass = secureOverwriteString(pass);
-      pass = null as any;
+      zeroizeString(secret);
       
       await engine.cipher.setKey(key);
     } catch (err) {

@@ -54,4 +54,16 @@ describe('Cryptit text helpers - extra cases', () => {
     const plain        = await browserCrypt.decryptText(cipher, 'pw');
     expect(plain).toBe('cross-ok');
   });
+
+  it('rejects **truncated ciphertext** with a meaningful error', async () => {
+    const cipher = await crypt.encryptText('cut-off', 'pw');
+    const damaged = cipher.slice(0, cipher.length - 10);      // remove tail
+    await expect(crypt.decryptText(damaged, 'pw')).rejects.toThrow();
+  });
+
+  it('supports switching to **scheme 1** (XChaCha20-Poly1305)', async () => {
+    crypt.setScheme(1);
+    const cipher = await crypt.encryptText('scheme-1', 'pw');
+    expect(await crypt.decryptText(cipher, 'pw')).toBe('scheme-1');
+  });
 });

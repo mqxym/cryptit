@@ -40,7 +40,7 @@ export function base64Encode(...chunks: Uint8Array[]): string {
     for (let i = 0; i < data.length; i++) binary += String.fromCharCode(data[i]);
     return btoa(binary);
   } catch (err: any) {
-    const msg = "Base64 Enconding Error";
+    const msg = "Base64 Encoding Error";
     throw new EncodingError(msg);
   }
   
@@ -50,7 +50,7 @@ export function base64Encode(...chunks: Uint8Array[]): string {
 export function base64Decode(b64: string): Uint8Array {
   try {
     if (!/^[A-Za-z0-9+/]+={0,2}$/.test(b64) || b64.length % 4 !== 0) {
-      throw new Error('invalid base64');
+      throw new Error('Invalid Base64');
     }
     
     if (isNodeLike()) {
@@ -68,12 +68,9 @@ export function base64Decode(b64: string): Uint8Array {
   }  
 }
 
-export function secureOverwriteString(str: string): string {
-    const length = str.length;
-    const randomBytes = new Uint8Array(length);
-    crypto.getRandomValues(randomBytes);
-
-    return Array.from(randomBytes, byte =>
-        String.fromCharCode(33 + (byte % 94)) // printable ASCII range
-    ).join('');
+export function zeroizeString(ref: { value: string }): void {
+  /* Overwrite the existing string reference before GC kicks in */
+  const len  = ref.value.length;
+  const fill = new Array(len).fill('\0').join('');
+  (ref as any).value = fill;            // in‑place overwrite
 }

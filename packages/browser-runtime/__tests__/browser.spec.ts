@@ -16,3 +16,13 @@ describe('browser-runtime facade', () => {
     expect(plain).toBe('Foo');
   });
 });
+
+describe('browser-runtime scheme 1', () => {
+  const crypt = createCryptit({ chunkSize: 1024, scheme: 1 });
+
+  it('encrypts & decrypts in a browser context', async () => {
+    const cipher = await crypt.encryptText('Foo', 'pw');
+    const plain  = await crypt.decryptText(cipher, 'pw');
+    expect(plain).toBe('Foo');
+  });
+});
