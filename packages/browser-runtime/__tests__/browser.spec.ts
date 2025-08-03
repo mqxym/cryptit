@@ -17,7 +17,7 @@ describe('browser-runtime facade', () => {
   });
 });
 
-describe('browser-runtime scheme 1', () => {
+describe('browser-runtime | Scheme 1', () => {
   const crypt1 = createCryptit({ difficulty: "low", saltStrength: "low", scheme: 1 });
 
   it('encrypts & decrypts in a browser context', async () => {

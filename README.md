@@ -1,12 +1,21 @@
 # @mqxym/cryptit
 
-Modern, cross-platform **AES-GCM 256 / XChaCha20Poly1305 + Argon2-id** encryption for both **files** *and* **text**.
+Modern, cross-platform encryption for both **files** *and* **text**.
 
 * **Node 18 / Bun 1** - native `argon2` addon + WebCrypto
 * **Browser (evergreen)** - tiny WASM build of `argon2-browser`
 * **CLI** - stream encryption & decryption, zero memory bloat
 * **TypeScript-first**, tree-shakable, ESM & CJS builds
 * **Format-agnostic decryption** - one instance reads any registered scheme
+
+## Scheme Support
+
+Currently there are 2 encryption schemes supported:
+
+* **Scheme 0** (default): **AES-GCM 256** (native via Crypto API) and **Argon2id** (single thread parallelism setup using `argon2` or `argon2-browser`)
+* **Scheme 1**: **XChaCha20Poly1305** (via JavaScript engine `@noble/cipehrs`) and and **Argon2id** (multi thread parallelism setup using `argon2` or `argon2-browser`)
+
+The library can support up to 8 schemes via a header info byte (3 bit allocated).
 
 ---
 
@@ -27,7 +36,7 @@ yarn add @mqxym/cryptit           # or npm i / pnpm add
 ```ts
 import { createCryptit } from "@mqxym/cryptit";
 
-const crypt = createCryptit({ difficulty: "middle" });
+const crypt = createCryptit({ scheme: 1 });
 const pass  = "correct horse battery staple";
 
 const b64 = await crypt.encryptText("hello", pass);
@@ -89,7 +98,7 @@ await c.encryptText("txt", pass);
 await c.decryptText(b64,  pass);
 
 // runtime tweaks
-c.setDifficulty("high");
+c.setDifficulty("high"); // Argon2id difficulty preset
 c.setScheme(1);           // choose another registered format (scheme 1 = XChaCha20Poly1305)
 c.setSaltDifficulty("low");
 

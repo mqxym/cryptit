@@ -5,6 +5,7 @@ export interface EncryptionAlgorithm {
   encryptChunk(plain : Uint8Array): Promise<Uint8Array>;
   decryptChunk(cipher: Uint8Array): Promise<Uint8Array>;
   setKey(k: CryptoKey): Promise<void>;
+  readonly IV_LENGTH: number;
 }
 
 /* ------------------------- Key derivation ---------------------------- */
@@ -18,6 +19,11 @@ export interface KeyDerivation<D extends string = string> {
   ): Promise<CryptoKey>;
 }
 
+export interface CipherConstructor {
+  /* static */ readonly IV_LENGTH: number;
+  new (p: CryptoProvider): EncryptionAlgorithm;
+}
+
 /* ---------------------------------------------------------------------
    Generic descriptor of one “format scheme".
 
@@ -29,7 +35,7 @@ export interface SchemeDescriptor<
   D extends string = string,
 > {
   readonly id: number;                                          // 3-bit header field
-  readonly cipher: new (p: CryptoProvider) => EncryptionAlgorithm;
+  readonly cipher: CipherConstructor;
   readonly kdf: KeyDerivation<D>;
 
   readonly saltLengths : Record<S, number>;                     // e.g. { low: 12, high: 16 }

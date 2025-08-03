@@ -23,6 +23,7 @@ import {
   type Verbosity,
   type Logger,
 } from './util/logger.js';
+import { ByteSource }          from './util/ByteSource.js';
 
 import {
   EncryptionError,
@@ -68,6 +69,10 @@ export interface CryptitOptions {
   /** Optional custom logger callback (receives formatted messages) */
   logger?       : (msg: string) => void;
 }
+
+export type DecodeDataResult =
+  | { isChunked: true;  chunks: { chunkSize: number; count: number; totalPayload: number } }
+  | { isChunked: false; payloadLength: number; params: { iv: Uint8Array; tag: Uint8Array } };
 
 /**
  * Cryptit provides high-level encryption/decryption utilities for text, blobs, and streams.
@@ -145,6 +150,82 @@ export class Cryptit {
       salt       : base64Encode(h.salt),
       saltLength : h.salt.byteLength,
     };
+  }
+
+  /**
+   * Inspect an encrypted payload and return either:
+   *   • chunk statistics for file/stream containers
+   *   • IV/nonce & auth‑tag for single‑block text containers
+   *
+   * This never decrypts – it merely parses framing bytes.
+   */
+  static async decodeData(
+    input: string | Uint8Array | Blob,
+  ): Promise<DecodeDataResult> {
+    // Read up to 256 B to validate header
+    const src       = new ByteSource(input);
+    const headSlice = await src.read(0, Math.min(256, src.length));
+    const header    = await Cryptit.peekHeader(headSlice);
+    const { scheme, headerLen } = decodeHeader(header);
+
+    // Compute remaining payload length
+    const totalLen  = src.length;
+    const remain    = totalLen - headerLen;
+    if (remain <= 0) {
+      throw new InvalidHeaderError('Payload is empty');
+    }
+
+    const first4   = await src.read(headerLen, 4);
+    const firstLen = new DataView(first4.buffer, first4.byteOffset, 4)
+                      .getUint32(0, false);
+
+    const looksChunked =
+      firstLen + 4 <= remain &&  // frame fits
+      firstLen >= 28;            // at least IV+tag
+
+    if (looksChunked) {
+      // ——— chunked container ———
+      const chunkSize = firstLen;
+      let offset = headerLen;
+      let count  = 0;
+      let total  = 0;
+
+      while (offset + 4 <= totalLen) {
+        const lenBuf = await src.read(offset, 4);
+        const len    = new DataView(lenBuf.buffer, lenBuf.byteOffset, 4)
+                          .getUint32(0, false);
+        if (len === 0 || offset + 4 + len > totalLen) break;
+        count++;
+        total += len;
+        offset += 4 + len;
+      }
+
+      return {
+        isChunked: true,
+        chunks: {
+          chunkSize,
+          count,
+          totalPayload: total,
+        },
+      };
+    }
+
+    // ——— single-block (encryptText) ———
+    const cipher      = await src.read(headerLen, remain);
+    const ivLen       = SchemeRegistry.get(scheme).cipher.IV_LENGTH;
+    if (cipher.length < ivLen + 16) {
+      throw new InvalidHeaderError('Ciphertext too short for IV & tag');
+    }
+
+    return {
+      isChunked: false,
+      // full encrypted payload length (including IV+cipher+tag)
+      payloadLength: remain,
+      params: {
+        iv : cipher.slice(0, ivLen),
+        tag: cipher.slice(cipher.length - 16),
+      },
+    } as const;
   }
 
   // ════════════════════════════════════════════════════════════════════════

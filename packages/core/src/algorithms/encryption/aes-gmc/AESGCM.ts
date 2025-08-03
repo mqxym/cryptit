@@ -4,6 +4,9 @@ import { EncryptionAlgorithm } from '../../../types/index.js';
 import { DecryptionError }   from '../../../errors/index.js';
 
 export class AESGCM implements EncryptionAlgorithm {
+  public static readonly IV_LENGTH: number = 12;
+  public readonly IV_LENGTH = AESGCM.IV_LENGTH;
+
   private key!: CryptoKey;
 
   constructor(private readonly p: CryptoProvider) {}
@@ -11,7 +14,11 @@ export class AESGCM implements EncryptionAlgorithm {
   async setKey(k: CryptoKey) { this.key = k; }
 
   async encryptChunk(plain: Uint8Array): Promise<Uint8Array> {
-    const iv = this.p.getRandomValues(new Uint8Array(12));
+    
+    const iv = this.p.getRandomValues(
+      new Uint8Array(AESGCM.IV_LENGTH),
+    );
+
     const cipher = new Uint8Array(
       await this.p.subtle.encrypt({ name: 'AES-GCM', iv }, this.key, plain),
     );
@@ -23,8 +30,8 @@ export class AESGCM implements EncryptionAlgorithm {
   }
 
   async decryptChunk(data: Uint8Array): Promise<Uint8Array> {
-    const iv     = data.slice(0, 12);
-    const cipher = data.slice(12);
+    const iv     = data.slice(0, AESGCM.IV_LENGTH);
+    const cipher = data.slice(AESGCM.IV_LENGTH);
     try {
       const plain = await this.p.subtle.decrypt(
         { name: 'AES-GCM', iv },

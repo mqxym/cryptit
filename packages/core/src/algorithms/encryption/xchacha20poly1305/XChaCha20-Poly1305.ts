@@ -4,6 +4,10 @@ import { EncryptionAlgorithm } from '../../../types/index.js';
 import { DecryptionError } from '../../../errors/index.js';
 
 export class XChaCha20Poly1305 implements EncryptionAlgorithm {
+
+  public static readonly IV_LENGTH: number = 24;
+  public readonly IV_LENGTH = XChaCha20Poly1305.IV_LENGTH;
+
   private key!: Uint8Array;
 
   constructor(private readonly p: CryptoProvider) {}
@@ -21,7 +25,7 @@ export class XChaCha20Poly1305 implements EncryptionAlgorithm {
    * - Prepends nonce to ciphertext || tag
    */
   async encryptChunk(plain: Uint8Array): Promise<Uint8Array> {
-    const nonce = this.p.getRandomValues(new Uint8Array(24));
+    const nonce = this.p.getRandomValues(new Uint8Array(XChaCha20Poly1305.IV_LENGTH));
     const cipher = xchacha20poly1305(this.key, nonce);
     const cipherAndTag = cipher.encrypt(plain);
     plain.fill(0);
@@ -38,8 +42,8 @@ export class XChaCha20Poly1305 implements EncryptionAlgorithm {
    * - Throws on authentication failure
    */
   async decryptChunk(data: Uint8Array): Promise<Uint8Array> {
-    const nonce = data.slice(0, 24);
-    const cipherAndTag = data.slice(24);
+    const nonce = data.slice(0, XChaCha20Poly1305.IV_LENGTH);
+    const cipherAndTag = data.slice(XChaCha20Poly1305.IV_LENGTH);
     const cipher = xchacha20poly1305(this.key, nonce);
     try {
       return cipher.decrypt(cipherAndTag);
