@@ -153,7 +153,7 @@ cat movie.enc | cryptit decode
 Exit codes: **0** success · **1** any failure (invalid header, auth, I/O …)
 
 > [!NOTE]
-> Use the prompt password feature where ever possible, to not leak you password via history.
+> Use the prompt password feature where ever possible, to not leak your password via history.
 
 ---
 
