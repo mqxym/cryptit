@@ -3,12 +3,13 @@
    ------------------------------------------------------------------ */
 import { Cryptit } from '../src/index.js';
 import { nodeProvider } from '../../node-runtime/src/provider.js';
+import { SCHEMES } from './test.constants.js';
 
 const SINGLE_BYTE = new Blob([Uint8Array.of(0xA5)]);
 
 describe('Cryptit - tiny payload round -trips', () => {
 
-  it.each([0, 1] as const)('single -byte Blob | scheme %i', async scheme => {
+  it.each(SCHEMES)('single -byte Blob | scheme %i', async scheme => {
     const crypt = new Cryptit(nodeProvider, { scheme });
     const enc   = await crypt.encryptFile(SINGLE_BYTE, 'pw');
     const dec   = await crypt.decryptFile(enc, 'pw');

@@ -10,11 +10,38 @@
     rel="stylesheet"
   >
   <style>
-    body { padding: 2rem; }
     textarea { font-family: monospace; }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
 </head>
 <body>
+  <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="#">Cryptit Demo</a>
+    <button
+      class="navbar-toggler"
+      type="button"
+      data-bs-toggle="collapse"
+      data-bs-target="#demoNav"
+      aria-controls="demoNav"
+      aria-expanded="false"
+      aria-label="Toggle navigation"
+    >
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="demoNav">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        <li class="nav-item">
+          <a class="nav-link" href="text-encryption.html">Text Encryption</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="text-decoding.html">Header/Data Decoding</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
   <div class="container">
     <h1 class="mb-1">@mqyxm/cryptit</h1>
     <h2 class="mb-4">Text Encryption / Decryption Example</h2>
@@ -32,7 +59,8 @@
             <label for="scheme" class="form-label">Scheme ID (0 - max. 7)</label>
             <input type="number" min="0" value="0" class="form-control" id="scheme">
             <div class="form-text">0 = AES-GCM / Argon2id (single thread)</div>
-            <div class="form-text">1 = XChaCha20-Poly1305 / Argon2id (multithread)</div>
+            <div class="form-text">1 = XChaCha20-Poly1305 / Argon2id (multithread*)</div>
+            <small class="form-text">* not supported in browsers. </small>
           </div>
           <div class="col-md-4">
             <label for="difficulty" class="form-label">Argon2 Difficulty</label>
@@ -43,7 +71,7 @@
             </select>
           </div>
           <div class="col-md-4">
-            <label for="saltStrength" class="form-label">Salt Strength</label>
+            <label for="saltStrength" class="form-label">Salt Strength</label> 
             <select id="saltStrength" class="form-select">
               <option value="low">low</option>
               <option value="high" selected>high</option>

@@ -1,5 +1,6 @@
-import { SchemeRegistry } from '../src/config/SchemeRegistry.js';
-import { SchemeError }    from '../src/errors/index.js';
+import '../../src/config/defaults.js';
+import { SchemeRegistry } from '../../src/config/SchemeRegistry.js';
+import { SchemeError }    from '../../src/errors/index.js';
 
 describe('SchemeRegistry', () => {
   it('returns current (v0) descriptor', () => {

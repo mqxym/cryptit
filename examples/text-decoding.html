@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Cryptit Browser Demo – Header / Data Decoding</title>
+  <link rel="icon" href="./favicon.ico" type="image/x-icon">
+  <!-- Bootstrap 5 -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  >
+  <style>
+    textarea, pre { font-family: monospace; }
+    pre { white-space: pre-wrap; word-break: break-all; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+</head>
+
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="#">Cryptit Demo</a>
+    <button
+      class="navbar-toggler"
+      type="button"
+      data-bs-toggle="collapse"
+      data-bs-target="#demoNav"
+      aria-controls="demoNav"
+      aria-expanded="false"
+      aria-label="Toggle navigation"
+    >
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="demoNav">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        <li class="nav-item">
+          <a class="nav-link" href="text-encryption.html">Text Encryption</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="text-decoding.html">Header/Data Decoding</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+  <div class="container">
+    <h1 class="mb-1">@mqyxm/cryptit</h1>
+    <h2 class="mb-4">Header &amp; Payload Inspection Example</h2>
+
+    <!-- Input -->
+    <div class="row mb-3">
+      <div class="col-12">
+        <label for="cipherInput" class="form-label">Input (Base64 ciphertext / binary)</label>
+        <textarea id="cipherInput" class="form-control" rows="6"
+          placeholder="Paste Cryptit-encrypted Base64 payload here"></textarea>
+      </div>
+    </div>
+
+    <!-- Buttons -->
+    <div class="mb-3">
+      <button id="headerBtn" class="btn btn-primary me-2">Decode Header</button>
+      <button id="dataBtn"   class="btn btn-primary">Decode Data</button>
+    </div>
+
+    <!-- Results -->
+    <div class="row mb-3">
+      <div class="col-12">
+        <label for="resultBox" class="form-label">Decoded JSON</label>
+        <pre id="resultBox" class="border rounded p-3 bg-light" style="min-height: 10rem;"></pre>
+      </div>
+    </div>
+
+    <!-- Error -->
+    <div id="errBox" class="alert alert-danger d-none"></div>
+  </div>
+
+  <!-- Import minified browser bundle -->
+  <script type="module">
+    import { Cryptit } from "../dist/browser/cryptit.browser.min.js";
+    window.Cryptit = Cryptit;
+  </script>
+
+  <!-- Demo logic -->
+  <script type="module">
+    const { Cryptit }  = window;
+    const inp   = document.getElementById('cipherInput');
+    const out   = document.getElementById('resultBox');
+    const err   = document.getElementById('errBox');
+
+    function showErr(msg) {
+      err.textContent = msg;
+      err.classList.remove('d-none');
+    }
+    function clear() {
+      err.classList.add('d-none');
+      err.textContent = '';
+      out.textContent = '';
+    }
+    function pretty(obj) {
+      out.textContent = JSON.stringify(obj, null, 2);
+    }
+
+    document.getElementById('headerBtn').addEventListener('click', async () => {
+      clear();
+      try {
+        const meta = await Cryptit.headerDecode(inp.value.trim());
+        pretty(meta);
+      } catch (e) {
+        showErr(e?.message ?? String(e));
+      }
+    });
+
+    document.getElementById('dataBtn').addEventListener('click', async () => {
+      clear();
+      try {
+        const info = await Cryptit.decodeData(inp.value.trim());
+        /* For nicer display convert Uint8Arrays to Base64 strings */
+        if (!info.isChunked) {
+          const b64 = (u) => btoa(String.fromCharCode(...u));
+          info.params.iv  = b64(info.params.iv);
+          info.params.tag = b64(info.params.tag);
+        }
+        pretty(info);
+      } catch (e) {
+        showErr(e?.message ?? String(e));
+      }
+    });
+  </script>
+</body>
+</html>

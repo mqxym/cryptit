@@ -1,4 +1,4 @@
-name: Build and Release Bun CLI
+name: Build and Release Package and CLI
 
 on:
   push:

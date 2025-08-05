@@ -3,22 +3,28 @@ import { nodeProvider } from '../../node-runtime/src/provider.js';
 import { DecryptionError } from '../src/errors/index.js';
 import { browserProvider } from '../../browser-runtime/src/provider.js';
 import type { CryptoProvider } from '../src/providers/CryptoProvider.js';
+import { SCHEMES } from './test.constants.js';
 
-describe('Cryptit text helpers', () => {
-  const crypt = new Cryptit(nodeProvider);
+describe.each(SCHEMES)('Cryptit text helpers (scheme %i)', scheme => {
+  let crypt: Cryptit;
+
+  beforeEach(() => {
+    crypt = new Cryptit(nodeProvider, { scheme });
+  });
 
   it('encrypts & decrypts a UTF-8 string', async () => {
-    const secret = await crypt.encryptText('héllo 🌍', 'pw');
+    const secret = await crypt.encryptText('héllo 🌍', 'pw');
     expect(typeof secret).toBe('string');
     expect(secret).toMatch(/^[A-Za-z0-9+/]+=*$/);
 
     const plain = await crypt.decryptText(secret, 'pw');
-    expect(plain).toBe('héllo 🌍');
+    expect(plain).toBe('héllo 🌍');
   });
 
   it('fails with wrong passphrase', async () => {
     const cipher = await crypt.encryptText('test', 'a');
-    await expect(crypt.decryptText(cipher, 'b')).rejects.toThrow(DecryptionError);
+    await expect(crypt.decryptText(cipher, 'b'))
+      .rejects.toThrow(DecryptionError);
   });
 
   it('isEncrypted() detects Cryptit payloads', async () => {
@@ -32,8 +38,12 @@ describe('Cryptit text helpers', () => {
 /* ------------------------------------------------------------------ */
 /*  Additional edge-case & crossover tests                             */
 /* ------------------------------------------------------------------ */
-describe('Cryptit text helpers - extra cases', () => {
-  const crypt = new Cryptit(nodeProvider);
+describe.each(SCHEMES)('Cryptit text helpers extras (scheme %i)', scheme => {
+  let crypt: Cryptit;
+
+  beforeEach(() => {
+    crypt = new Cryptit(nodeProvider, { scheme });
+  });
 
   it('encrypts & decrypts an **empty string**', async () => {
     const cipher = await crypt.encryptText('', 'pw');

@@ -1,4 +1,4 @@
-import { createLogger } from '../src/util/logger.js';
+import { createLogger } from '../../src/util/logger.js';
 
 describe('tiny logger', () => {
   it('obeys verbosity levels', () => {

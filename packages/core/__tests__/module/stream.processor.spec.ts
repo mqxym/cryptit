@@ -1,5 +1,5 @@
-import { StreamProcessor }      from '../src/stream/StreamProcessor.js';
-import type { EncryptionAlgorithm } from '../src/types/index.js';
+import { StreamProcessor }      from '../../src/stream/StreamProcessor.js';
+import type { EncryptionAlgorithm } from '../../src/types/index.js';
 
 class FakeEngine implements EncryptionAlgorithm {
   async encryptChunk(p: Uint8Array) {

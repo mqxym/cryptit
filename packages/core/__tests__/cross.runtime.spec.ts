@@ -7,7 +7,7 @@ import { join, resolve } from 'path';
 import { execa } from 'execa';
 import { Cryptit } from '../../core/src/index.js';
 import { browserProvider } from '../../browser-runtime/src/provider.js';
-import type { CryptoProvider } from '../../core/src/providers/CryptoProvider.js';
+import { SCHEMES } from './test.constants.js';
 
 const CLI     = resolve(join(__dirname, '..', '..', 'node-runtime', 'src', 'cli.ts'));
 
@@ -21,18 +21,32 @@ async function runCli(args: string[]): Promise<string> {
     .then(res => res.stdout.trim());
 }
 
-describe('cryptit CLI ↔ browser-runtime', () => {
+
+describe.each(SCHEMES)('cryptit CLI ↔ browser-runtime (scheme %i)', scheme => {
   it('`encrypt-text` (CLI) → decryptText (browser)', async () => {
-    const cipher = await runCli(['encrypt-text', 'interop', '--pass', 'pw']);
-    const crypt  = new Cryptit(browserProvider as CryptoProvider);
+    // pass the scheme through to the CLI
+    const cipher = await runCli([
+      'encrypt-text', 'interop',
+      '--pass', 'pw',
+      '--scheme', scheme.toString(),
+    ]);
+
+    // mirror the same scheme in the browser-runtime
+    const crypt  = new Cryptit(browserProvider, { scheme });
     const plain  = await crypt.decryptText(cipher, 'pw');
     expect(plain).toBe('interop');
   });
 
   it('browser encrypt → `decrypt-text` (CLI)', async () => {
-    const crypt  = new Cryptit(browserProvider as CryptoProvider);
+    const crypt  = new Cryptit(browserProvider, { scheme });
     const cipher = await crypt.encryptText('cli-roundtrip', 'pw');
-    const plain  = await runCli(['decrypt-text', cipher, '--pass', 'pw']);
+
+    // pass the scheme through to the CLI
+    const plain  = await runCli([
+      'decrypt-text', cipher,
+      '--pass', 'pw',
+      '--scheme', scheme.toString(),
+    ]);
     expect(plain).toBe('cli-roundtrip');
   });
 });

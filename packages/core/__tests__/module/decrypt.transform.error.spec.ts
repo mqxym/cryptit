@@ -1,12 +1,14 @@
-import { DecryptTransform } from '../src/stream/DecryptTransform.js';
-import type { EncryptionAlgorithm } from '../src/types/index.js';
-import { DecryptionError } from '../src/errors/index.js';
+import { DecryptTransform } from '../../src/stream/DecryptTransform.js';
+import type { EncryptionAlgorithm } from '../../src/types/index.js';
+import { DecryptionError } from '../../src/errors/index.js';
 
 /*  Naïve “no-op” engine - just echoes data back  */
 class NopEngine implements EncryptionAlgorithm {
   async encryptChunk(p: Uint8Array) { return p; }
   async decryptChunk(c: Uint8Array) { return c; }
   async setKey() {}
+  IV_LENGTH: number;
+  zeroKey(): void {}
 }
 
 async function collect(rs: ReadableStream<Uint8Array>) {

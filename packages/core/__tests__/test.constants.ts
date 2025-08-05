@@ -1,0 +1,1 @@
+export const SCHEMES = [0, 1];

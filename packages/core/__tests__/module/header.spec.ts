@@ -1,6 +1,7 @@
-import { encodeHeader } from '../src/header/encoder.js';
-import { decodeHeader } from '../src/header/decoder.js';
-import { InvalidHeaderError } from '../src/errors/index.js';
+import '../../src/config/defaults.js';
+import { encodeHeader } from '../../src/header/encoder.js';
+import { decodeHeader } from '../../src/header/decoder.js';
+import { InvalidHeaderError } from '../../src/errors/index.js';
 
 describe('header encode/decode', () => {
   const salt = new Uint8Array(12).fill(9);
@@ -20,7 +21,7 @@ describe('header encode/decode', () => {
   });
 });
 
-import { HeaderDecodeError } from '../src/errors/index.js';               // NEW
+import { HeaderDecodeError } from '../../src/errors/index.js';               // NEW
 
 /* ------------------------------------------------------------------ */
 /*  Unknown-scheme detection                                          */

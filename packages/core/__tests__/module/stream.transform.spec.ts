@@ -1,6 +1,6 @@
-import { EncryptTransform } from '../src/stream/EncryptTransform.js';
-import { DecryptTransform } from '../src/stream/DecryptTransform.js';
-import type { EncryptionAlgorithm } from '../src/types/index.js';
+import { EncryptTransform } from '../../src/stream/EncryptTransform.js';
+import { DecryptTransform } from '../../src/stream/DecryptTransform.js';
+import type { EncryptionAlgorithm } from '../../src/types/index.js';
 
 class EchoEngine implements EncryptionAlgorithm {
   async encryptChunk(p: Uint8Array) { return p; }

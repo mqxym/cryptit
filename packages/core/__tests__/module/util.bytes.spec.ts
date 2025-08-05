@@ -2,8 +2,8 @@ import {
   base64Encode,
   base64Decode,
   concat,
-} from '../src/util/bytes.js';
-import { DecodingError } from '../src/errors/index.js';
+} from '../../src/util/bytes.js';
+import { DecodingError } from '../../src/errors/index.js';
 
 describe('util/bytes helpers', () => {
   const a = new Uint8Array([1, 2, 3]);

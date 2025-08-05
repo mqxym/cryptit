@@ -2,6 +2,7 @@ import { join, resolve } from 'path';
 import { promises as fs } from 'fs';
 import { randomBytes } from 'crypto';
 import { execa } from 'execa';
+import { SCHEMES } from '../../core/__tests__/test.constants';
 
 const CLI  = resolve(join(__dirname, '..', 'src', 'cli.ts'));
 const isBun = typeof Bun !== 'undefined' || !!process.env.BUN;
@@ -12,7 +13,7 @@ const run = (args: string[]) => {
   return execa(bin, [...extra, CLI, ...args], { encoding: 'utf8' });
 };
 
-describe('cryptit CLI – file round-trip', () => {
+describe('cryptit CLI - file round-trip', () => {
   let dir: string, plain: string, enc: string, dec: string;
 
   beforeAll(async () => {
@@ -30,7 +31,7 @@ describe('cryptit CLI – file round-trip', () => {
 
   afterAll(() => fs.rm(dir, { recursive: true, force: true }));
 
-  it.each([0, 1] as const)('scheme %i', async scheme => {
+  it.each(SCHEMES)('scheme %i', async scheme => {
     await run(['encrypt', plain, '--pass', 'pw', '--out', enc, '--scheme', String(scheme)]);
     await run(['decrypt', enc,   '--pass', 'pw', '--out', dec]);
 

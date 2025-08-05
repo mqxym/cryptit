@@ -1,5 +1,5 @@
-import { EngineManager } from '../src/engine/EngineManager.js';
-import { nodeProvider }  from '../../node-runtime/src/provider.js';
+import { EngineManager } from '../../src/engine/EngineManager.js';
+import { nodeProvider }  from '../../../node-runtime/src/provider.js';
 
 describe('EngineManager', () => {
   it('caches engines per scheme', () => {
