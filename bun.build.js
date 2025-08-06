@@ -116,6 +116,24 @@ await doBuild({
   sourcemap: "external",
 });
 
+/*
+// ---- Browser bundle ----
+await doBuild({
+  entrypoints: ["packages/browser-runtime/src/index.ts"],
+  outdir: outdirBrowser,
+  minify: true,
+  format: "iife",
+  external: ["commander", "buffer", "process", "argon2"],
+  target: "browser",
+  footer: "globalThis.createCryptit = createCryptit;",
+  naming: {
+    entry: "cryptit.browser.global.min.[ext]",
+    chunk: "[name]-[hash].[ext]",
+    asset: "[name].[ext]",
+  },
+  sourcemap: "external",
+});*/
+
 // Post-build WASM handling
 const wasmSrc = join(outdirBrowser, "argon2.wasm");
 const wasmDst = join("examples", "argon2.wasm");

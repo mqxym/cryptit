@@ -23,7 +23,8 @@ import {
   type Verbosity,
   type Logger,
 } from './util/logger.js';
-import { ByteSource }          from './util/ByteSource.js';
+import {  ByteSource, RandomAccessSource }          from './util/ByteSource.js';
+
 
 import {
   EncryptionError,
@@ -160,10 +161,12 @@ export class Cryptit {
    * This never decrypts - it merely parses framing bytes.
    */
   static async decodeData(
-    input: string | Uint8Array | Blob,
+    input: string | Uint8Array | Blob | RandomAccessSource,
   ): Promise<DecodeDataResult> {
-    // Read up to 256 B to validate header
-    const src       = new ByteSource(input);
+    /* normalise into a random-access reader */
+    const src: RandomAccessSource = typeof (input as any)?.read === 'function'
+      ? (input as RandomAccessSource)
+      : new ByteSource(input as string | Uint8Array | Blob);
     const headSlice = await src.read(0, Math.min(256, src.length));
     const header    = await Cryptit.peekHeader(headSlice);
     const { scheme, headerLen } = decodeHeader(header);

@@ -55,3 +55,51 @@ export class ByteSource {
     return this.#buf;
   }
 }
+
+// packages/core/src/util/bytes.ts
+/* eslint-disable @typescript-eslint/explicit-function-return-type */
+import { promises as fs } from 'fs';
+
+/* -------------------------------------------------- */
+/*  Generic random-access reader interface            */
+/* -------------------------------------------------- */
+export interface RandomAccessSource {
+  /** total length in bytes */
+  readonly length: number;
+
+  /**
+   * return a copy of bytes `[offset, offset + len)`
+   * throws if the range is out of bounds
+   */
+  read(offset: number, len: number): Promise<Uint8Array>;
+}
+
+/* -------------------------------------------------- */
+/*  File-backed implementation (streams on-demand)    */
+/* -------------------------------------------------- */
+export class FileByteSource implements RandomAccessSource {
+  private constructor(
+    private readonly fd: fs.FileHandle,
+    public readonly length: number,
+  ) {}
+
+  static async open(path: string): Promise<FileByteSource> {
+    const fd   = await fs.open(path, 'r');
+    const stat = await fd.stat();
+    return new FileByteSource(fd, stat.size);
+  }
+
+  async read(offset: number, len: number): Promise<Uint8Array> {
+    if (offset < 0 || len < 0 || offset + len > this.length) {
+      throw new RangeError('read() slice exceeds data bounds');
+    }
+    const buf = Buffer.allocUnsafe(len);
+    await this.fd.read(buf, 0, len, offset);
+    return new Uint8Array(buf);
+  }
+
+  /** always call after finishing */
+  async close(): Promise<void> {
+    await this.fd.close();
+  }
+}

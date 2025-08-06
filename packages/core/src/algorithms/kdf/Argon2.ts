@@ -11,7 +11,7 @@ export class Argon2KDF implements KeyDerivation<'low' | 'middle' | 'high'> {
 
   constructor(
     private readonly presets: Readonly<Record<'low' | 'middle' | 'high', Argon2Tuning>>,
-    private exportExtractable: Boolean = false
+    private exportExtractable: boolean = false
   ) {}
 
   async derive(

@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // packages/node-runtime/src/cli.ts
 import { Command, Option } from 'commander';
-import { existsSync, accessSync, constants as fsConstants, realpathSync, realpath} from 'node:fs';
+import { existsSync, accessSync, constants as fsConstants, realpathSync} from 'node:fs';
 import { createReadStream, createWriteStream } from 'node:fs';
 import { stdin, stdout, stderr, exit as processExit } from 'node:process';
 import { Readable as NodeReadable, Writable as NodeWritable } from 'node:stream';
-import { open as openFile } from 'node:fs/promises';  
+import { FileByteSource } from '../../core/src/util/ByteSource.js';
 import { createCryptit } from './index.js';
 import { Cryptit } from '../../core/src/index.js';
 import { dirname , resolve, sep, isAbsolute} from 'node:path';
@@ -178,11 +178,13 @@ process.on('unhandledRejection', (err: unknown) => {
 });
 
 
-async function readAllStdin(): Promise<Buffer> {
-  const bufs: Buffer[] = [];
-  for await (const chunk of stdin) bufs.push(chunk as Buffer);
-  return Buffer.concat(bufs);
-}
+/* ------------------------------------------------------------------ */
+/*  Decode command (stream-safe)                                       */
+/* ------------------------------------------------------------------ */
+;
+import { promises as fsp } from 'fs';
+import * as os   from 'os';
+import * as path from 'path';
 
 program
   .command('decode [src]')
@@ -190,62 +192,144 @@ program
     'Show Cryptit header information plus payload details; omit arg or use - to read from STDIN',
   )
   .action(async (src?: string) => {
-    const { verbose } = program.opts();
-    const logSink     = (msg: string) => stderr.write(msg);
-    const crypt       = createCryptit({ verbose, logger: logSink });
-
     const useStdin = !src || src === '-';
 
-    /** 
-     * Inspect a Buffer or Base64 string: 
-     * feed only up to 256 bytes into headerDecode, then let decodeData handle the rest.
-     */
+    /* -------------------------------------------------------------- */
+    /*  Helpers                                                       */
+    /* -------------------------------------------------------------- */
+
+    /** Inspect an in-memory buffer or Base-64 string */
     async function decodeBinary(buf: Uint8Array): Promise<Record<string, unknown>> {
       if (buf.length < 2) throw new Error('Input too short for header');
 
-      // slice up to 256 bytes for header parsing
-      const headSlice = buf.subarray(0, Math.min(256, buf.length));
+      const headSlice  = buf.subarray(0, Math.min(256, buf.length));
       const headerMeta = await Cryptit.headerDecode(headSlice);
 
-      const dataMeta = await Cryptit.decodeData(buf);
+      const dataMeta   = await Cryptit.decodeData(buf);
 
       if (dataMeta.isChunked) {
         const { chunkSize, count, totalPayload } = dataMeta.chunks;
-        return { ...headerMeta, isChunked: true, chunks: { chunkSize, count, totalPayload } };
-      } else {
-        const ivB64  = Buffer.from(dataMeta.params.iv).toString('base64');
-        const tagB64 = Buffer.from(dataMeta.params.tag).toString('base64');
-        return { ...headerMeta, isChunked: false, payloadLength: dataMeta.payloadLength, params: { iv: ivB64, tag: tagB64 } };
+        return {
+          ...headerMeta,
+          isChunked: true,
+          chunks: { chunkSize, count, totalPayload },
+        };
       }
+
+      const ivB64  = Buffer.from(dataMeta.params.iv).toString('base64');
+      const tagB64 = Buffer.from(dataMeta.params.tag).toString('base64');
+      return {
+        ...headerMeta,
+        isChunked: false,
+        payloadLength: dataMeta.payloadLength,
+        params: { iv: ivB64, tag: tagB64 },
+      };
     }
 
-    if (!useStdin && src) {
-      // file path mode: read entire file as buffer once (only for payload; header is limited above)
-      const fd    = await openFile(src, 'r');
-      const { size } = await fd.stat();
-      const whole = Buffer.alloc(size);
-      await fd.read(whole, 0, size, 0);
-      await fd.close();
+    /** Decode via random-access source (file or temp file) */
+    async function decodeFromSource(src: FileByteSource): Promise<Record<string, unknown>> {
+      const head        = await src.read(0, Math.min(256, src.length));
+      const headerMeta  = await Cryptit.headerDecode(head);
+      const dataMeta    = await Cryptit.decodeData(src);
 
-      const meta = await decodeBinary(new Uint8Array(whole));
+      if (dataMeta.isChunked) {
+        const { chunkSize, count, totalPayload } = dataMeta.chunks;
+        return {
+          ...headerMeta,
+          isChunked: true,
+          chunks: { chunkSize, count, totalPayload },
+        };
+      }
+
+      const ivB64  = Buffer.from(dataMeta.params.iv).toString('base64');
+      const tagB64 = Buffer.from(dataMeta.params.tag).toString('base64');
+      return {
+        ...headerMeta,
+        isChunked: false,
+        payloadLength: dataMeta.payloadLength,
+        params: { iv: ivB64, tag: tagB64 },
+      };
+    }
+
+    /** Stream STDIN to a temporary file and return its absolute path */
+    async function stdinToTempFile(): Promise<string> {
+      const dir     = await fsp.mkdtemp(path.join(os.tmpdir(), 'cryptit-'));
+      const tmpPath = path.join(dir, 'stdin.bin');
+      const out     = createWriteStream(tmpPath);
+
+      await new Promise<void>((resolve, reject) => {
+        process.stdin.pipe(out);
+        out.on('finish', resolve);
+        out.on('error', reject);
+        process.stdin.on('error', reject);
+      });
+
+      return tmpPath;
+    }
+
+    /* -------------------------------------------------------------- */
+    /*  File-path input (streamed)                                     */
+    /* -------------------------------------------------------------- */
+    if (!useStdin && src) {
+      const fileSrc = await FileByteSource.open(src);
+      try {
+        const meta = await decodeFromSource(fileSrc);
+        stdout.write(JSON.stringify(meta, null, 2) + '\n');
+      } finally {
+        await fileSrc.close();
+      }
+      return;
+    }
+
+    /* -------------------------------------------------------------- */
+    /*  STDIN input (stream-to-temp, then decode)                      */
+    /* -------------------------------------------------------------- */
+    if (useStdin) {
+      const tmpPath = await stdinToTempFile();
+      const fileSrc = await FileByteSource.open(tmpPath);
+
+      try {
+        /* Attempt to parse as raw Cryptit binary first */
+        try {
+          const meta = await decodeFromSource(fileSrc);
+          stdout.write(JSON.stringify(meta, null, 2) + '\n');
+          return;
+        } catch {
+          /* fall through – maybe it’s Base-64 text */
+        }
+      } finally {
+        await fileSrc.close();
+      }
+
+      /* Reload temp file as UTF-8 text and attempt Base-64 path */
+      const text = (await fsp.readFile(tmpPath, { encoding: 'utf8' })).trim();
+      await fsp.unlink(tmpPath);
+
+      const isB64 = /^[A-Za-z0-9+/]+={0,2}$/.test(text) && text.length % 4 === 0;
+      if (!isB64) {
+        stderr.write('Error: Input neither valid Cryptit binary nor Base-64 text\n');
+        processExit(1);
+      }
+
+      const data = Buffer.from(text, 'base64');
+      const meta = await decodeBinary(new Uint8Array(data));
       stdout.write(JSON.stringify(meta, null, 2) + '\n');
       return;
     }
 
-    const buf = useStdin
-      ? await readAllStdin()
-      : Buffer.from(src!, 'utf8');
-    const text = buf.toString('utf8').trim();
+    /* -------------------------------------------------------------- */
+    /*  Literal string argument (Base-64 or raw binary)                */
+    /* -------------------------------------------------------------- */
+    const buf   = Buffer.from(src!, 'utf8');
+    const text  = buf.toString('utf8').trim();
     const isB64 = /^[A-Za-z0-9+/]+={0,2}$/.test(text) && text.length % 4 === 0;
 
     try {
       if (isB64) {
-        // for Base64 text, decode once to Uint8Array
         const data = Buffer.from(text, 'base64');
         const meta = await decodeBinary(new Uint8Array(data));
         stdout.write(JSON.stringify(meta, null, 2) + '\n');
       } else {
-        // literal binary
         const meta = await decodeBinary(new Uint8Array(buf));
         stdout.write(JSON.stringify(meta, null, 2) + '\n');
       }

@@ -39,7 +39,7 @@ export function base64Encode(...chunks: Uint8Array[]): string {
     let binary = '';
     for (let i = 0; i < data.length; i++) binary += String.fromCharCode(data[i]);
     return btoa(binary);
-  } catch (err: any) {
+  } catch (err: unknown) {
     const msg = "Base64 Encoding Error";
     throw new EncodingError(msg);
   }

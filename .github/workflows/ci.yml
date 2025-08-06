@@ -10,6 +10,6 @@ jobs:
         with:
           bun-version: latest
       - run: bun install --frozen-lockfile
-#      - run: bun run lint
+      - run: bun lint || true
       - run: bun test
-#      - run: bun run build
+      - run: bun run build
