@@ -25,7 +25,6 @@ import {
 } from './util/logger.js';
 import {  ByteSource, RandomAccessSource }          from './util/ByteSource.js';
 
-
 import {
   EncryptionError,
   DecryptionError,

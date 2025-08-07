@@ -11,7 +11,7 @@ import { Cryptit } from '../../core/src/index.js';
 import { dirname , resolve, sep, isAbsolute} from 'node:path';
 
 
-const PKG_VERSION = '0.2.12'; // sync with root package.json
+const PKG_VERSION = '0.2.13'; // sync with root package.json
 
 const DEFAULT_ROOT = process.cwd();
 
@@ -93,7 +93,7 @@ const program = new Command();
 program
   .name('cryptit')
   .version(PKG_VERSION)
-  .description('Text and File Encryption Utility\n' + 'Scheme 0: AES-GCM / Argon2id (Single Thread)\n' +'Scheme 1: XChaCha20-Poly1305 / Argon2id (Parallel)')
+  .description('Text and File Encryption Utility\n' + 'Scheme 0: AES-GCM (Native) / Argon2id (Single Thread)\n' +'Scheme 1: XChaCha20-Poly1305 (JS Engine) / Argon2id (Parallel)')
 
   .addOption(
     new Option('-S, --scheme <0-1>', 'encryption scheme version')

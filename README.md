@@ -139,6 +139,12 @@ cryptit decode movie.enc
 cat movie.enc | cryptit decode
 ```
 
+## Docker CLI
+
+```bash
+echo "AQVWgYDH/rkR6Ymxv1W9NzFWTsvTTXsnEaLHPx+NlATmuwcqea5RlljX1ly16Px716I2yGX/XsXHt7xG14DmnJ3Czu0A9/TM1sPJayRdHDYPckJ5eGfAGY5n5H8nNjKqhpY=" | docker run --rm -i cryptit:latest decode | jq
+```
+
 ### Common flags
 
 | Flag                      | Default | Description          |

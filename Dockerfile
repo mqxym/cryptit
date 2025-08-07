@@ -1,13 +1,15 @@
-FROM node:22-slim AS runner
+FROM oven/bun:latest AS runner
 
-WORKDIR /usr/src/app
+WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci --omit=dev
+COPY bun.lock ./
 
-COPY dist ./dist
+RUN bun install --production
 
-ENV NODE_ENV=production
+COPY packages/ ./packages
 
-ENTRYPOINT ["node", "dist/cryptit.cli.js"]
+RUN bun build --compile --external=argon2-browser --outfile=cryptit packages/node-runtime/src/cli.ts
+
+ENTRYPOINT ["/app/cryptit"]
 CMD []
