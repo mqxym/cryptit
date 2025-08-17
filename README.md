@@ -1,4 +1,5 @@
 # @mqxym/cryptit
+[![Base CI](https://github.com/mqxym/cryptit/actions/workflows/base-ci.yml/badge.svg)](https://github.com/mqxym/cryptit/actions/workflows/base-ci.yml)
 
 Modern, cross-platform encryption for both **files** *and* **text**.
 
