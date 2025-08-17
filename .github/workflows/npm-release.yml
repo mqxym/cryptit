@@ -11,6 +11,7 @@ permissions:
 env:
   ENTRYPOINT: packages/node-runtime/src/cli.ts
   OUTDIR: "cli-out"
+  BUN_INSTALL_CACHE_DIR: ${{ runner.temp }}/bun-cache
 
 jobs:
   build:
@@ -70,6 +71,8 @@ jobs:
       - run: bun test --timeout 20000
         shell: bash
 
+      - run: mkdir -p "${{ env.BUN_INSTALL_CACHE_DIR }}"
+        shell: bash
 
       - name: Build for ${{ matrix.target }}
         run: |
