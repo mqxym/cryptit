@@ -35,6 +35,7 @@ import {
 } from './errors/index.js';
 
 import { EngineManager, type Engine } from './engine/EngineManager.js';
+import { ensureUint8Array } from './util/convert.js';
 
 // ────────────────────────────────────────────────────────────────────────────
 //  Public configuration shape
@@ -670,9 +671,11 @@ export class Cryptit {
   }
 
   private static async readAsUint8(input: string | Uint8Array | Blob): Promise<Uint8Array> {
-    if (typeof input === 'string')      return base64Decode(input);
-    if (input instanceof Uint8Array)    return input;
-    if (input instanceof Blob)          return new Uint8Array(await input.arrayBuffer());
-    throw new HeaderDecodeError('Unsupported input type');
+    if (typeof input === 'string') return base64Decode(input);
+    if (input instanceof Blob) {
+      const slice = input.slice(0, 64);
+      return new Uint8Array(await slice.arrayBuffer());
+    }
+    return input;
   }
 }

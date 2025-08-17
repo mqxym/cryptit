@@ -24,7 +24,7 @@ describe('util/bytes helpers', () => {
     expect(() => base64Decode('*not-b64*')).toThrow(DecodingError);
   });
 
-  it('rejects Base64 containing **whitespace**', () => {
+  it('rejects Base64 containing whitespace', () => {
     expect(() => base64Decode('Zm8 g')).toThrow(DecodingError);
   });
 

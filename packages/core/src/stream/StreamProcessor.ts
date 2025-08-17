@@ -2,6 +2,7 @@
 import { EncryptTransform } from './EncryptTransform.js';
 import { DecryptTransform } from './DecryptTransform.js';
 import type { EncryptionAlgorithm } from '../types/index.js';
+import { collectStream } from '../util/stream.js';
 
 export class StreamProcessor {
   constructor(
@@ -49,29 +50,6 @@ export class StreamProcessor {
     transform: TransformStream<Uint8Array, Uint8Array>,
     prefix: Uint8Array | null = null,
   ): Promise<Uint8Array> {
-    const reader = readable.pipeThrough(transform).getReader();
-    const chunks: Uint8Array[] = [];
-    if (prefix?.length) chunks.push(prefix);
-
-    try {
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-      }
-
-      await reader.closed;
-    } finally {
-      reader.releaseLock();
-    }
-
-    const total = chunks.reduce((n, c) => n + c.byteLength, 0);
-    const out   = new Uint8Array(total);
-    let offset  = 0;
-    for (const c of chunks) {
-      out.set(c, offset);
-      offset += c.byteLength;
-    }
-    return out;
+   return collectStream(readable.pipeThrough(transform), prefix ?? undefined);
   }
 }

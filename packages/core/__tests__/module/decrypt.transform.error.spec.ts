@@ -11,14 +11,10 @@ class NopEngine implements EncryptionAlgorithm {
   zeroKey(): void {}
 }
 
-async function collect(rs: ReadableStream<Uint8Array>) {
-  const r = rs.getReader(); const parts: Uint8Array[] = [];
-  for (;;) { const { done, value } = await r.read(); if (done) break; parts.push(value); }
-  return Uint8Array.from(parts.flatMap(b => [...b]));
-}
+import { collectStream as collect } from '../../src/util/stream.js';
 
 describe('DecryptTransform  frame-length guard-rails', () => {
-  it('throws DecryptionError when declared frame length exceeds **2: chunkSize**', async () => {
+  it('throws DecryptionError when declared frame length exceeds2: chunkSize', async () => {
     const engine = new NopEngine();
     const ts = new DecryptTransform(engine, 8).toTransformStream();   // ⇒ limit = 16 bytes
 

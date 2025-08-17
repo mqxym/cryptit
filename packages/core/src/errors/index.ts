@@ -19,3 +19,4 @@ export class HeaderDecodeError    extends CryptitError {}
 export class KeyDerivationError   extends CryptitError {}
 export class EncryptionError      extends CryptitError {}
 export class DecryptionError      extends CryptitError {}
+export class FilesystemError      extends CryptitError {}

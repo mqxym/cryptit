@@ -6,6 +6,7 @@
 import { join, resolve } from 'path';
 import { execa } from 'execa';
 import { Cryptit } from '../../core/src/index.js';
+import { promises as fs }  from 'fs';
 import { browserProvider } from '../../browser-runtime/src/provider.js';
 import { SCHEMES } from './test.constants.js';
 
@@ -48,5 +49,25 @@ describe.each(SCHEMES)('cryptit CLI ↔ browser-runtime (scheme %i)', scheme => 
       '--scheme', scheme.toString(),
     ]);
     expect(plain).toBe('cli-roundtrip');
+  });
+
+  it('round-trips a 64 MiB binary', async () => {
+    const dir   = await fs.mkdtemp(join(__dirname, 'cryptit-xrt-'));
+    const plain = join(dir, 'plain.bin');
+    const enc   = join(dir, 'enc.bin');
+
+    const srcBytes = crypto.getRandomValues(new Uint8Array(65_536));
+    await fs.writeFile(plain, srcBytes);
+
+    await runCli(['encrypt', plain, '--pass', 'pw', '--out', enc, '--scheme', String(scheme)]);
+
+    const encBuf = await fs.readFile(enc);
+    const browserCrypt = new Cryptit(browserProvider, { scheme });
+    const decBlob      = await browserCrypt.decryptFile(new Blob([encBuf]), 'pw');
+    const decBytes     = new Uint8Array(await decBlob.arrayBuffer());
+
+    expect(decBytes).toEqual(srcBytes);
+
+    await fs.rm(dir, { recursive: true, force: true });
   });
 });

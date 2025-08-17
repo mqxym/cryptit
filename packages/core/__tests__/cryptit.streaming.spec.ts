@@ -1,21 +1,6 @@
 import { Cryptit }      from '../src/index.js';
 import { nodeProvider } from '../../node-runtime/src/provider.js';
-
-// jest.setTimeout(20_000);
-
-/* ------------------------------------------------------------------ */
-/*  Helper: collect full stream into a single Uint8Array               */
-/* ------------------------------------------------------------------ */
-async function collect(rs: ReadableStream<Uint8Array>) {
-  const rd   = rs.getReader();
-  const out: Uint8Array[] = [];
-  for (;;) {
-    const { done, value } = await rd.read();
-    if (done) break;
-    out.push(value);
-  }
-  return Uint8Array.from(out.flatMap(c => [...c]));
-}
+import { collectStream as collect } from '../src/util/stream.js';
 
 /* ------------------------------------------------------------------ */
 /*  Tests                                                              */

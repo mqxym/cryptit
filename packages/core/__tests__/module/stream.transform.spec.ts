@@ -10,16 +10,7 @@ class EchoEngine implements EncryptionAlgorithm {
   zeroKey(): void {}
 }
 
-async function collect<T extends Uint8Array>(rs: ReadableStream<T>) {
-  const r = rs.getReader();
-  const chunks: Uint8Array[] = [];
-  for (;;) {
-    const { done, value } = await r.read();
-    if (done) break;
-    chunks.push(value);
-  }
-  return Uint8Array.from(chunks.flatMap(c => [...c]));
-}
+import { collectStream as collect } from '../../src/util/stream.js';
 
 describe('Encrypt/Decrypt Transform framing', () => {
   const engine = new EchoEngine();

@@ -1,5 +1,6 @@
 // packages/core/src/util/ByteSource.ts
 import { base64Decode } from './bytes.js';
+import { assertSliceBounds } from './range.js';
 
 /**
  * Unified, zero -copy accessor for Blob | Uint8Array | Base64 -encoded string.
@@ -24,9 +25,7 @@ export class ByteSource {
    * The returned view is a fresh copy — safe to mutate by caller.
    */
   async read(offset: number, len: number): Promise<Uint8Array> {
-    if (offset < 0 || len < 0 || offset + len > this.length) {
-      throw new RangeError('read() slice exceeds data bounds');
-    }
+    assertSliceBounds(this.length, offset, len);
 
     // Uint8Array path - cheapest
     if (this.src instanceof Uint8Array) {
@@ -90,9 +89,7 @@ export class FileByteSource implements RandomAccessSource {
   }
 
   async read(offset: number, len: number): Promise<Uint8Array> {
-    if (offset < 0 || len < 0 || offset + len > this.length) {
-      throw new RangeError('read() slice exceeds data bounds');
-    }
+    assertSliceBounds(this.length, offset, len);
     const buf = Buffer.allocUnsafe(len);
     await this.fd.read(buf, 0, len, offset);
     return new Uint8Array(buf);

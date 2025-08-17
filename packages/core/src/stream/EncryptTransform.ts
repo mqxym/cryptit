@@ -1,5 +1,7 @@
 // packages/core/src/stream/EncryptTransform.ts
 import type { EncryptionAlgorithm } from '../types/index.js';
+import { ensureUint8Array } from '../util/convert.js';
+import { encodeFrameLen, FRAME_HEADER_BYTES } from '../util/frame.js';
 
 /**
  * TransformStream that:
@@ -19,7 +21,7 @@ export class EncryptTransform {
     return new TransformStream({
       transform: async (chunk, ctl) => {
         await this.transform(
-          await this.asUint8Array(chunk),
+          await ensureUint8Array(chunk),
           ctl,
         );
       },
@@ -44,15 +46,11 @@ export class EncryptTransform {
       offset += this.chunkSize;
 
       const encrypted = await this.engine.encryptChunk(block);
-
-      const header = new Uint8Array(4);
-      new DataView(header.buffer).setUint32(0, encrypted.length, false);
-
-      const out = new Uint8Array(4 + encrypted.length);
-      out.set(header);
-      out.set(encrypted, header.length);
-
+      const out = new Uint8Array(FRAME_HEADER_BYTES + encrypted.length);
+      out.set(encodeFrameLen(encrypted.length));
+      out.set(encrypted, FRAME_HEADER_BYTES);
       ctl.enqueue(out);
+    
     }
 
     this.buffer = combined.slice(offset);
@@ -62,24 +60,14 @@ export class EncryptTransform {
     if (!this.buffer.length) return;
     const encrypted = await this.engine.encryptChunk(this.buffer);
 
-    const header = new Uint8Array(4);
-    new DataView(header.buffer).setUint32(0, encrypted.length, false);
-
-    const out = new Uint8Array(4 + encrypted.length);
-    out.set(header);
-    out.set(encrypted, 4);
-
+    const out = new Uint8Array(FRAME_HEADER_BYTES + encrypted.length);
+    out.set(encodeFrameLen(encrypted.length));
+    out.set(encrypted, FRAME_HEADER_BYTES);
     ctl.enqueue(out);
+    
     this.buffer = new Uint8Array(0);
 
     this.engine.zeroKey();
   }
 
-  private async asUint8Array(
-    input: Uint8Array | ArrayBuffer | Blob,
-  ): Promise<Uint8Array> {
-    if (input instanceof Uint8Array) return input;
-    if (input instanceof ArrayBuffer) return new Uint8Array(input);
-    return new Uint8Array(await input.arrayBuffer());
-  }
 }

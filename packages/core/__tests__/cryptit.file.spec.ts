@@ -34,7 +34,7 @@ describe('Cryptit file helpers | Scheme 1', () => {
 describe('Cryptit file helpers - extra cases', () => {
   const crypt = new Cryptit(nodeProvider);
 
-  it('round-trips a **zero-byte Blob**', async () => {
+  it('round-trips a zero-byte Blob', async () => {
     const empty = new Blob([]);
     const enc   = await crypt.encryptFile(empty, 'pw');
     const dec   = await crypt.decryptFile(enc, 'pw');

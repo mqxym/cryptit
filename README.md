@@ -188,7 +188,7 @@ bun install && bun run build && bun test
 * Salts generated per-ciphertext; never reused
 
 > [!IMPORTANT]
-> **DISCLAIMER** This project was created in collaboration with OpenAI’s language models (o3 / o3-pro) and me, @mqxym.
+> **DISCLAIMER** This project was created in collaboration with OpenAI’s language models and me, @mqxym.
 
 ---
 

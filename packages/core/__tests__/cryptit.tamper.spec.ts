@@ -10,17 +10,7 @@ function flipBit(buf: Uint8Array, i = 0): Uint8Array {
   out[i] ^= 0x80;
   return out;
 }
-
-async function collect(rs: ReadableStream<Uint8Array>) {
-  const r = rs.getReader();
-  const parts: Uint8Array[] = [];
-  for (;;) {
-    const { done, value } = await r.read();
-    if (done) break;
-    parts.push(value);
-  }
-  return Uint8Array.from(parts.flatMap(b => [...b]));
-}
+import { collectStream as collect } from '../src/util/stream.js';
 
 describe.each(SCHEMES)('Cryptit - ciphertext integrity guard (scheme %i)', scheme => {
   let crypt: Cryptit;

@@ -4,14 +4,15 @@ import { Command, Option } from 'commander';
 import { existsSync, accessSync, constants as fsConstants, realpathSync} from 'node:fs';
 import { createReadStream, createWriteStream } from 'node:fs';
 import { stdin, stdout, stderr, exit as processExit } from 'node:process';
-import { Readable as NodeReadable, Writable as NodeWritable } from 'node:stream';
+import { FilesystemError } from '../../core/src/errors/index.js';
 import { FileByteSource } from '../../core/src/util/ByteSource.js';
 import { createCryptit } from './index.js';
 import { Cryptit } from '../../core/src/index.js';
 import { dirname , resolve, sep, isAbsolute} from 'node:path';
+import { toWebReadable, toWebWritable } from './streamAdapter.js';
 
 
-const PKG_VERSION = '0.2.13'; // sync with root package.json
+const PKG_VERSION = '0.2.14'; // sync with root package.json
 
 const DEFAULT_ROOT = process.cwd();
 
@@ -59,27 +60,20 @@ function assertWritable(out: string, root: string = DEFAULT_ROOT) {
   const realTarget = realpathSync(targetDir);
 
   if (!realTarget.startsWith(absRoot + sep)) {
-    throw new Error('Refusing to write outside of root directory.');
+    throw new FilesystemError('Refusing to write outside of root directory.');
   }
   if (!existsSync(targetDir)) {
-    throw new Error(`Output directory does not exist: ${targetDir}`);
+    throw new FilesystemError(`Output directory does not exist: ${targetDir}`);
   }
 
   try {
     accessSync(targetDir, fsConstants.W_OK);
   } catch {
-    throw new Error(`Output directory is not writeable`);
+    throw new FilesystemError(`Output directory is not writeable`);
   }
   
 
   return absOut;
-}
-
-function nodeToWeb(reader: typeof stdin | import('node:fs').ReadStream) {
-  return (NodeReadable as any).toWeb(reader) as ReadableStream<Uint8Array>;
-}
-function nodeToWebW(writer: typeof stdout | import('node:fs').WriteStream) {
-  return (NodeWritable as any).toWeb(writer) as WritableStream<Uint8Array>;
 }
 
 async function readAllFromStdin(): Promise<string> {
@@ -376,8 +370,8 @@ program
     const outStream = cmd.out === '-' ? stdout : createWriteStream(cmd.out);
 
     const { header, writable, readable } = await crypt.createEncryptionStream(pass);
-    const webIn  = nodeToWeb(inStream);
-    const webOut = nodeToWebW(outStream);
+    const webIn  = toWebReadable(inStream);
+    const webOut = toWebWritable(outStream);
 
     // 1) Write header
     const w = webOut.getWriter();
@@ -423,8 +417,8 @@ program
     const inStream  = src  === '-' ? stdin  : createReadStream(src);
     const outStream = cmd.out === '-' ? stdout : createWriteStream(cmd.out);
 
-    const webIn  = nodeToWeb(inStream);
-    const webOut = nodeToWebW(outStream);
+    const webIn  = toWebReadable(inStream);
+    const webOut = toWebWritable(outStream);
     const ts     = await crypt.createDecryptionStream(pass);
 
     await Promise.all([

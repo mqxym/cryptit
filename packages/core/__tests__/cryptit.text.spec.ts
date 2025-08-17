@@ -45,18 +45,18 @@ describe.each(SCHEMES)('Cryptit text helpers extras (scheme %i)', scheme => {
     crypt = new Cryptit(nodeProvider, { scheme });
   });
 
-  it('encrypts & decrypts an **empty string**', async () => {
+  it('encrypts & decrypts an empty string', async () => {
     const cipher = await crypt.encryptText('', 'pw');
     expect(await crypt.decryptText(cipher, 'pw')).toBe('');
   });
 
-  it('handles **multi-megabyte** UTF-8 data (> default chunk size)', async () => {
+  it('handles multi-megabyte UTF-8 data (> default chunk size)', async () => {
     const big = 'x'.repeat(1_200_000);               // ≈ 1.2 MiB
     const cipher = await crypt.encryptText(big, 'pw');
     expect(await crypt.decryptText(cipher, 'pw')).toBe(big);
   });
 
-  it('cross-runtime: **node encrypt → browser decrypt**', async () => {
+  it('cross-runtime: node encrypt → browser decrypt', async () => {
     const nodeCrypt = new Cryptit(nodeProvider);
     const cipher    = await nodeCrypt.encryptText('cross-ok', 'pw');
 
@@ -65,13 +65,13 @@ describe.each(SCHEMES)('Cryptit text helpers extras (scheme %i)', scheme => {
     expect(plain).toBe('cross-ok');
   });
 
-  it('rejects **truncated ciphertext** with a meaningful error', async () => {
+  it('rejects truncated ciphertext with a meaningful error', async () => {
     const cipher = await crypt.encryptText('cut-off', 'pw');
     const damaged = cipher.slice(0, cipher.length - 10);      // remove tail
     await expect(crypt.decryptText(damaged, 'pw')).rejects.toThrow();
   });
 
-  it('supports switching to **scheme 1** (XChaCha20-Poly1305)', async () => {
+  it('supports switching to scheme 1 (XChaCha20-Poly1305)', async () => {
     crypt.setScheme(1);
     const cipher = await crypt.encryptText('scheme-1', 'pw');
     expect(await crypt.decryptText(cipher, 'pw')).toBe('scheme-1');

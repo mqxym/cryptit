@@ -8,7 +8,11 @@ export function encodeHeader(
   saltStrength: 'low' | 'high',
   salt: Uint8Array,
 ): Uint8Array {
-  const diffCode = { low: 0, middle: 1, high: 2 }[difficulty] ?? 0;
+  const diffMap = { low: 0, middle: 1, high: 2 } as const;
+  if (!(difficulty in diffMap))
+    throw new TypeError(`Unsupported difficulty: ${difficulty}`);
+  const diffCode = diffMap[difficulty as keyof typeof diffMap];
+  
   const infoByte = (scheme << 5) | ((saltStrength === 'high' ? 1 : 0) << 2) | diffCode;
   return concat(new Uint8Array([HEADER_START_BYTE, infoByte]), salt);
 }

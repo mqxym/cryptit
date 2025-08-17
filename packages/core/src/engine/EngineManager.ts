@@ -46,17 +46,17 @@ export class EngineManager {
     engine : Engine,
     secret   : Secret,
     salt   : Uint8Array,
-    diff   : string,
+    difficulty: 'low' | 'middle' | 'high',
   ): Promise<void> {
     try {
-      const key = await engine.kdf.derive(secret.value, salt, diff as any, engine.provider);
-      
-      zeroizeString(secret);
+      const key = await engine.kdf.derive(secret.value, salt, difficulty, engine.provider);
       
       await engine.cipher.setKey(key);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       throw new KeyDerivationError(msg);
+    } finally {
+       zeroizeString(secret);
     }
   }
 }
