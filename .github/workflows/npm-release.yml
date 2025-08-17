@@ -11,7 +11,6 @@ permissions:
 env:
   ENTRYPOINT: packages/node-runtime/src/cli.ts
   OUTDIR: "cli-out"
-  BUN_INSTALL_CACHE_DIR: ${{ runner.temp }}/bun-cache
 
 jobs:
   build:
@@ -73,6 +72,8 @@ jobs:
 
       - run: mkdir -p "${{ env.BUN_INSTALL_CACHE_DIR }}"
         shell: bash
+        env:
+          BUN_INSTALL_CACHE_DIR: ${{ runner.temp }}/bun-cache
 
       - name: Build for ${{ matrix.target }}
         run: |
@@ -82,6 +83,8 @@ jobs:
             "${{ env.ENTRYPOINT }}" \
             --outfile "${{ env.OUTDIR }}/cryptit-cli-${{ matrix.target }}${{ matrix.ext }}"
         shell: bash 
+        env:
+          BUN_INSTALL_CACHE_DIR: ${{ runner.temp }}/bun-cache
 
       - name: Upload artifact (${{
           matrix.target }})
