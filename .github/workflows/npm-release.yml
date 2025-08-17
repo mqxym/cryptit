@@ -77,7 +77,7 @@ jobs:
           bun build --compile \
             --target=${{ matrix.target }} \
             "${{ env.ENTRYPOINT }}" \
-            --outfile "${{ env.OUTDIR }}/myapp-${{ matrix.target }}${{ matrix.ext }}"
+            --outfile "${{ env.OUTDIR }}/cryptit-cli-${{ matrix.target }}${{ matrix.ext }}"
         shell: bash 
 
       - name: Upload artifact (${{
