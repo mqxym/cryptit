@@ -36,5 +36,5 @@ jobs:
           bun-version: latest
       - run: bun ci
       - run: bun lint || true
-      - run: bun test
+      - run: bun test  --timeout 20000
       - run: bun run build

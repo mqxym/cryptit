@@ -136,7 +136,7 @@ await doBuild({
 
 // Post-build WASM handling
 const wasmSrc = join(outdirBrowser, "argon2.wasm");
-const wasmDst = join("examples", "argon2.wasm");
+const wasmDst = join("examples", "assets", "argon2.wasm");
 copyFileSync(wasmSrc, wasmDst);
 
 console.log("All builds complete");

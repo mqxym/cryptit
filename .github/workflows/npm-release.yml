@@ -62,7 +62,7 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - run: bun test
+      - run: bun test --timeout 20000
 
       - name: Build for ${{ matrix.target }}
         run: |

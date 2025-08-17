@@ -26,6 +26,40 @@ type Argon2HashResult = {
   // the full Argon2 encoded string (salt, params, hash)
   encoded: string;
 };
+
+// needed for crossover tests
+async function ensureArgon2ModuleHook(): Promise<void> {
+  // Only needed in non-browser test runners (Node/Bun). In real browsers we let the default work.
+  if (typeof window !== 'undefined') return;
+
+  if ((globalThis as any).loadArgon2WasmModule) return;
+
+  try {
+    const { createRequire } = await import('node:module');
+    const { readFile }      = await import('node:fs/promises');
+    const require           = createRequire(import.meta.url);
+
+    const jsPath   = require.resolve('argon2-browser/dist/argon2.js');
+    const wasmPath = require.resolve('argon2-browser/dist/argon2.wasm');
+
+    (globalThis as any).loadArgon2WasmModule = async () => {
+
+      const wasmBinary = new Uint8Array(await readFile(wasmPath));
+
+    
+      (globalThis as any).Module = {
+        wasmBinary,
+        // Also provide locateFile as a fallback for any internal lookups
+        locateFile: (p: string) =>
+          p === 'argon2.wasm' ? wasmPath : p,
+      };
+        return require(jsPath);
+    
+    };
+  } catch {
+  }
+}
+
 /**
  * Derive a 32-byte hash with Argon2-id.
  *
@@ -65,15 +99,7 @@ export async function argon2id(
 
   // ————————————————————————————  Browser  ————————————————————————————
   if (env === 'browser') {
-    if (!('loadArgon2WasmBinary' in globalThis)) {
-      (globalThis as any).loadArgon2WasmBinary = () =>
-        fetch('argon2.wasm')
-          .then((res) => {
-            if (!res.ok) throw new Error('Failed to load argon2.wasm');
-            return res.arrayBuffer();
-          })
-          .then((buf) => new Uint8Array(buf));
-    }
+    await ensureArgon2ModuleHook();
 
     return Argon2Browser.hash({
       pass: password,
