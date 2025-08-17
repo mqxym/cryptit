@@ -5,8 +5,12 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 env:
   ENTRYPOINT: packages/node-runtime/src/cli.ts
+  OUTDIR: "cli-out"
 
 jobs:
   build:
@@ -60,17 +64,22 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        run: bun install
+        run: bun ci
+        shell: bash
 
       - run: bun test --timeout 20000
+        shell: bash
+
 
       - name: Build for ${{ matrix.target }}
         run: |
-          mkdir -p $OUT_DIR
+          mkdir -p "${{ env.OUTDIR }}"
           bun build --compile \
             --target=${{ matrix.target }} \
-            $ENTRYPOINT \
-            --outfile $OUT_DIR/myapp-${{ matrix.target }}${{ matrix.ext }}
+            "${{ env.ENTRYPOINT }}" \
+            --outfile "${{ env.OUTDIR }}/myapp-${{ matrix.target }}${{ matrix.ext }}"
+        shell: bash
+
 
       - name: Upload artifact (${{
           matrix.target }})
