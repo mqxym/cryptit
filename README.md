@@ -15,7 +15,7 @@ Currently there are 2 encryption schemes supported:
 * **Scheme 0** (default): **AES-GCM 256** (native via Crypto API) and **Argon2id** (single thread parallelism setup using `argon2` or `argon2-browser`\*)
 * **Scheme 1**: **XChaCha20Poly1305** (via JavaScript engine `@noble/ciphers`) and and **Argon2id** (multi thread parallelism setup using `argon2` or `argon2-browser`\*)
 
-**\*** This means that for the same "difficulty" setting, the KDF will be significantly faster (and thus weaker) in the browser than in Node.js.
+**\*** This means that for the same "difficulty" setting, the KDF will be significantly slower in the browser than in Node.js.
 
 The library can support up to 8 schemes via a header info byte (3 bit allocated).
 
