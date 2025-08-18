@@ -90,8 +90,8 @@ jobs:
           matrix.target }})
         uses: actions/upload-artifact@v4
         with:
-          name: myapp-${{ matrix.target }}${{ matrix.ext }}
-          path: ${{ env.OUTDIR }}/myapp-${{ matrix.target }}${{ matrix.ext }}
+          name: cryptit-cli--${{ matrix.target }}${{ matrix.ext }}
+          path: ${{ env.OUTDIR }}/cryptit-cli-${{ matrix.target }}${{ matrix.ext }}
 
   release:
     name: Upload to GitHub Release
