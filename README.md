@@ -74,11 +74,18 @@ await createReadStream("movie.enc")
 ## Browser usage
 
 ```html
+<script>
+  // This needs to be included before the actual importing of cryptit
+  // IMPORTANT: host argon2.wasm where the fetch command points to
+  window.loadArgon2WasmBinary = () =>
+    fetch("/examples/assets/argon2.wasm")
+      .then(r => r.arrayBuffer())
+      .then(buf => new Uint8Array(buf));
+</script>
+
 <!-- app.ts / app.js -->
 <script type="module">
   import { createCryptit } from "@mqxym/cryptit/browser";
-
-  // IMPORTANT: host argon2.wasm at /argon2.wasm (relative to final HTML)
 
   const crypt = createCryptit({ saltStrength: "high", verbose: 2 });
 
