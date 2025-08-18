@@ -143,6 +143,8 @@ cat movie.enc | cryptit decode
 ## Docker CLI
 
 ```bash
+docker pull ghcr.io/mqxym/cryptit-cli:latest
+
 echo "AQVWgYDH/rkR6Ymxv1W9NzFWTsvTTXsnEaLHPx+NlATmuwcqea5RlljX1ly16Px716I2yGX/XsXHt7xG14DmnJ3Czu0A9/TM1sPJayRdHDYPckJ5eGfAGY5n5H8nNjKqhpY=" | docker run --rm -i cryptit:latest decode | jq
 ```
 
