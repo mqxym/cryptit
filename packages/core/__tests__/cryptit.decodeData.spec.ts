@@ -12,7 +12,7 @@ describe('Cryptit.decodeData (payload inspector)', () => {
     if (!meta.isChunked) {
       expect(meta.params.iv.byteLength).toBe(12);   // AES-GCM IV length
       expect(meta.params.tag.byteLength).toBe(16);  // 128-bit auth-tag
-      expect(meta.payloadLength).toBeGreaterThan(12 + 16);
+      expect(meta.payloadLength).toBe(7); //Just data
     }
   });
 
