@@ -6,7 +6,9 @@ export interface EncryptionAlgorithm {
   decryptChunk(cipher: Uint8Array): Promise<Uint8Array>;
   setKey(k: CryptoKey): Promise<void>;
   zeroKey(): void;
+  setAAD(aadData: Uint8Array): void; //set additional data (header)
   readonly IV_LENGTH: number;
+  readonly TAG_LENGTH: number;
 }
 
 /* ------------------------- Key derivation ---------------------------- */
@@ -22,6 +24,7 @@ export interface KeyDerivation<D extends string = string> {
 
 export interface CipherConstructor {
   /* static */ readonly IV_LENGTH: number;
+  /* static */ readonly TAG_LENGTH: number
   new (p: CryptoProvider): EncryptionAlgorithm;
 }
 

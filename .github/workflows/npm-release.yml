@@ -115,17 +115,25 @@ jobs:
     name: Publish to npm
     needs: release
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     steps:
         - uses: actions/checkout@v4
+
         - uses: oven-sh/setup-bun@v2
           with:
             bun-version: latest
-        - run: bun install
+
+        - run: bun ci
+
         - run: bun run build
+
         - uses: actions/setup-node@v4
           with:
             registry-url: https://registry.npmjs.org/
-        - run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
-        - run: npm publish --access public
-          env:
-            NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+            node-version: '20'
+        
+        - run: npm whoami
+
+        - run: npm publish --access public --provenance

@@ -24,8 +24,9 @@ updates:
       - "dependencies"
     commit-message:
       prefix: "chore(bun)"
-    reviewers:
+    assignees:
       - "mqxym"
+
   - package-ecosystem: "github-actions"
     directory: "/"               
     schedule:
@@ -36,5 +37,18 @@ updates:
       - "infra"
     commit-message:
       prefix: "chore(ci)"
-    reviewers:
+    assignees:
+      - "mqxym"
+
+  - package-ecosystem: "docker"
+    directory: "/" 
+    schedule:
+      interval: "weekly"
+      day_of_week: "saturday"
+    open-pull-requests-limit: 5
+    labels:
+      - "infra"
+    commit-message:
+      prefix: "chore(docker)"
+    assignees:
       - "mqxym"

@@ -1,5 +1,5 @@
 import { SchemeRegistry } from './SchemeRegistry.js';
-import { AESGCM } from '../algorithms/encryption/aes-gmc/AESGCM.js';
+import { AESGCM } from '../algorithms/encryption/aes-gcm/AESGCM.js';
 import { XChaCha20Poly1305 } from '../algorithms/encryption/xchacha20poly1305/XChaCha20-Poly1305.js';
 import { Argon2KDF } from '../algorithms/kdf/Argon2.js';
 import { SchemeDescriptor } from '../types/index.js';

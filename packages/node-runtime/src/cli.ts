@@ -12,7 +12,7 @@ import { dirname , resolve, sep, isAbsolute} from 'node:path';
 import { toWebReadable, toWebWritable } from './streamAdapter.js';
 
 
-const PKG_VERSION = '0.2.14'; // sync with root package.json
+const PKG_VERSION = '1.3.0'; // sync with root package.json
 
 const DEFAULT_ROOT = process.cwd();
 
@@ -216,7 +216,7 @@ program
         ...headerMeta,
         isChunked: false,
         payloadLength: dataMeta.payloadLength,
-        params: { iv: ivB64, tag: tagB64 },
+        params: { iv: ivB64, ivLength: dataMeta.params.ivLength, tag: tagB64, tagLength: dataMeta.params.tagLength },
       };
     }
 
@@ -247,18 +247,49 @@ program
 
     /** Stream STDIN to a temporary file and return its absolute path */
     async function stdinToTempFile(): Promise<string> {
+      // Default 1 GiB limit; allow override via env (bytes)
+      const envLimit = Number(process.env.CRYPTIT_STDIN_MAX_BYTES);
+      const MAX_BYTES = Number.isFinite(envLimit) && envLimit > 0
+        ? Math.floor(envLimit)
+        : 10_073_741_824; // 10 GiB
+
       const dir     = await fsp.mkdtemp(path.join(os.tmpdir(), 'cryptit-'));
       const tmpPath = path.join(dir, 'stdin.bin');
-      const out     = createWriteStream(tmpPath);
+      const out     = createWriteStream(tmpPath, { flags: 'w' });
 
-      await new Promise<void>((resolve, reject) => {
-        process.stdin.pipe(out);
-        out.on('finish', resolve);
-        out.on('error', reject);
-        process.stdin.on('error', reject);
-      });
+      let written = 0;
 
-      return tmpPath;
+      try {
+        for await (const chunk of process.stdin) {
+          const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as any);
+          written += buf.length;
+
+          if (written > MAX_BYTES) {
+            // Stop writing, remove partial file/dir, and error out
+            out.destroy();
+            await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
+            throw new FilesystemError(
+              `STDIN exceeds maximum allowed size (${MAX_BYTES} bytes). Aborting.`
+            );
+          }
+
+          if (!out.write(buf)) {
+            await new Promise<void>(resolve => out.once('drain', resolve));
+          }
+        }
+
+        await new Promise<void>((resolve, reject) => {
+          out.end(() => resolve());
+          out.on('error', reject);
+        });
+
+        return tmpPath;
+      } catch (err) {
+        // Best-effort cleanup on any failure
+        out.destroy();
+        await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
+        throw err;
+      }
     }
 
     /* -------------------------------------------------------------- */

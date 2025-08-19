@@ -7,7 +7,7 @@ describe('header encode/decode', () => {
   const salt = new Uint8Array(12).fill(9);
 
   it('is a perfect round-trip', () => {
-    const h = encodeHeader(0, 'high', 'high', salt);
+    const h = encodeHeader(0, 'high', 'low', salt);
     const dec = decodeHeader(h);
     expect(dec.scheme).toBe(0);
     expect(dec.difficulty).toBe('high');

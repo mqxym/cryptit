@@ -52,4 +52,8 @@ export class StreamProcessor {
   ): Promise<Uint8Array> {
    return collectStream(readable.pipeThrough(transform), prefix ?? undefined);
   }
+
+  public getEngine() : EncryptionAlgorithm {
+    return this.engine;
+  }
 }
