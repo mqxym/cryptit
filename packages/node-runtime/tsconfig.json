@@ -2,13 +2,13 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "composite": true,
-    "declarationDir": "../../build/node-runtime",
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "declarationDir": "../../dist/types/node-runtime",
     "rootDir": "src",
-    "types": ["node"],                        // Node globals & fs/stream types
-    "tsBuildInfoFile": "../../build/node-runtime/.tsbuildinfo"
+    "types": ["node"],
+    "tsBuildInfoFile": "../../dist/types/.node-runtime.tsbuildinfo"
   },
-  "include": ["src/**/*.ts"],
-  "references": [
-    { "path": "../core" }                     // depends on core
-  ]
+  "include": ["src/**/*.ts", "src/**/*.d.ts"],
+  "references": [{ "path": "../core" }]
 }

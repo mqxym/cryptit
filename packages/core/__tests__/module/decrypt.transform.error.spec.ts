@@ -7,8 +7,10 @@ class NopEngine implements EncryptionAlgorithm {
   async encryptChunk(p: Uint8Array) { return p; }
   async decryptChunk(c: Uint8Array) { return c; }
   async setKey() {}
-  IV_LENGTH: number;
-  zeroKey(): void {}
+  zeroKey() {}
+  readonly IV_LENGTH = 0;
+  readonly TAG_LENGTH = 0;
+  setAAD(aadData: Uint8Array): void {}
 }
 
 import { collectStream as collect } from '../../src/util/stream.js';

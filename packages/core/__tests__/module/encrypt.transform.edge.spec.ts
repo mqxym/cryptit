@@ -1,9 +1,9 @@
 /* ------------------------------------------------------------------
    EncryptTransform – defensive limits
    ------------------------------------------------------------------ */
-import { EncryptTransform }   from '../src/stream/EncryptTransform.js';
-import type { EncryptionAlgorithm } from '../src/types/index.js';
-import { collectStream }      from '../src/util/stream.js';
+import { EncryptTransform }   from '../../src/stream/EncryptTransform.js';
+import type { EncryptionAlgorithm } from '../../src/types/index.js';
+import { collectStream }      from '../../src/util/stream.js';
 
 class NopEngine implements EncryptionAlgorithm {
   async encryptChunk(p: Uint8Array) { return p; }
@@ -11,6 +11,8 @@ class NopEngine implements EncryptionAlgorithm {
   async setKey() {}
   zeroKey() {}
   readonly IV_LENGTH = 0;
+  readonly TAG_LENGTH = 0;
+  setAAD(aadData: Uint8Array): void {}
 }
 
 describe('EncryptTransform upper-bound check', () => {

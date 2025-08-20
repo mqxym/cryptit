@@ -6,4 +6,5 @@ export function createCryptit(cfg?: CryptitOptions): Cryptit {
   return new Cryptit(nodeProvider, cfg);
 }
 
-export type { CryptitOptions } from '../../core/src/index.js';
+export { Cryptit } from '../../core/src/index.js';
+export { ConvertibleInput, ConvertibleOutput } from '../../core/src/util/Convertible.js';

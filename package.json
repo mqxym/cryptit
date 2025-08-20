@@ -1,6 +1,6 @@
 {
     "name": "@mqxym/cryptit",
-    "version": "1.3.0",
+    "version": "2.1.0",
     "description": "Modern, cross-platform AES-GCM 256 / XChaCha20Poly1305 + Argon2-id encryption for files and text.",
     "type": "module",
     "keywords": [
@@ -20,17 +20,19 @@
     ],
     "main": "dist/cryptit.index.cjs",
     "module": "dist/cryptit.index.js",
+    "types": "dist/types/node-runtime/index.d.ts",
     "files": [
         "dist/",
         "README.md",
         "LICENSE"
     ],
     "scripts": {
-        "build:dts": "tsc -b",
-        "build": "bun run build:dts && bun run build:js",
+        "build:dts": "tsc -b packages/core packages/browser-runtime packages/node-runtime",
+        "build": "bun run build:js && bun run build:dts",
         "build:js": "bun run bun.build.js",
         "dev": "bun build bun.build.js --watch",
         "test": "bun test",
+        "audit": "bun audit",
         "lint": "eslint . --ext .ts",
         "cli:run": "bun run packages/node-runtime/src/cli.ts"
     },
@@ -58,16 +60,17 @@
     },
     "exports": {
         ".": {
+            "types": "./dist/types/node-runtime/index.d.ts",
             "import": "./dist/cryptit.index.js",
             "require": "./dist/cryptit.index.cjs"
         },
         "./browser": {
+            "types": "./dist/types/browser-runtime/index.d.ts",
             "import": "./dist/browser/cryptit.browser.min.js",
             "require": "./dist/browser/cryptit.browser.min.js"
         },
         "./cli": {
-            "import": "./dist/cli/cryptit.cli.js",
-            "require": "./dist/cli/cryptit.cli.cjs"
+            "default": "./dist/cli/cryptit.cli.js"
         },
         "./*.wasm": "./dist/browser/*.wasm"
     },

@@ -5,14 +5,17 @@
     "moduleResolution": "NodeNext",
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "strict": true,
-    "declaration": true,
-    "declarationMap": true,
-    "outDir": "build/",
-    "rootDir": ".",
-    "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
+    "esModuleInterop": false,
+    "allowSyntheticDefaultImports": true,
     "sourceMap": true,
-    "esModuleInterop": false
+    "baseUrl": ".", 
   },
-  "include": ["packages/*/src/**/*.ts"]
+  "files": [],
+  "references": [
+    { "path": "packages/core" },
+    { "path": "packages/browser-runtime" },
+    { "path": "packages/node-runtime" }
+  ],
+  "exclude": ["dist/**", "build/**"]
 }

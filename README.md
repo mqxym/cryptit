@@ -1,4 +1,5 @@
 # @mqxym/cryptit
+
 [![Base CI](https://github.com/mqxym/cryptit/actions/workflows/base-ci.yml/badge.svg)](https://github.com/mqxym/cryptit/actions/workflows/base-ci.yml)
 
 Modern, cross-platform encryption for both **files** *and* **text**.
@@ -45,8 +46,21 @@ import { createCryptit } from "@mqxym/cryptit";
 const crypt = createCryptit({ scheme: 1 });
 const pass  = "correct horse battery staple";
 
-const b64 = await crypt.encryptText("hello", pass);
-console.log(await crypt.decryptText(b64, pass)); // → "hello"
+// Encrypt: returns a ConvertibleOutput wrapper
+const out = await crypt.encryptText("hello", pass);
+
+// Pick your preferred representation
+console.log(out.base64);      // Base64 container
+console.log(out.hex);         // Hex container
+const bytes = out.uint8array; // Uint8Array container
+
+// Decrypt: accepts Base64, Uint8Array, or ConvertibleInput
+const dec = await crypt.decryptText(out.base64, pass);
+console.log(dec.text);        // "hello"
+
+// Clean sensitive buffers when done
+out.clear();
+dec.clear();
 ```
 
 ### Streaming files
@@ -91,7 +105,8 @@ await createReadStream("movie.enc")
 
   async function enc() {
     const cipher = await crypt.encryptText("hello", "pw");
-    console.log(cipher);
+    console.log(cipher.base64);  // or .hex / .uint8array
+    cipher.clear();
   }
   enc();
 </script>
@@ -104,20 +119,32 @@ await createReadStream("movie.enc")
 ## API highlights
 
 ```ts
+import { createCryptit, Cryptit } from "@mqxym/cryptit";
+// Also available: ConvertibleInput / ConvertibleOutput
+// import { ConvertibleInput, ConvertibleOutput } from "@mqxym/cryptit/util/convertible";
+
 const c = createCryptit({ verbose: 1 });
 
-// text
-await c.encryptText("txt", pass);
-await c.decryptText(b64,  pass);
+// TEXT 
+const enc: ConvertibleOutput =
+  await c.encryptText(/* string | Uint8Array | ConvertibleInput */ "txt", pass);
+// Choose your representation:
+enc.base64; enc.hex; enc.uint8array; // and wipe when done:
+enc.clear();
 
-// runtime tweaks
-c.setDifficulty("high"); // Argon2id difficulty preset
+const dec: ConvertibleOutput =
+  await c.decryptText(/* Base64 string | Uint8Array | ConvertibleInput */ enc.base64, pass);
+dec.text;
+dec.clear();
+
+// RUNTIME TWEAKS
+c.setDifficulty("high");  // Argon2id difficulty preset
 c.setScheme(1);           // choose another registered format (scheme 1 = XChaCha20Poly1305)
 c.setSaltDifficulty("low");
 
-// helpers
-Cryptit.isEncrypted(blobOrB64);          // ↦ boolean
-Cryptit.headerDecode(blobOrB64);         // ↦ meta {scheme, salt, …}
+// HELPERS
+Cryptit.isEncrypted(blobOrB64);   // ↦ boolean
+Cryptit.headerDecode(blobOrB64);  // ↦ meta {scheme, salt, …}
 ```
 
 Verbose levels:
@@ -135,12 +162,18 @@ Verbose levels:
 ## CLI (`cryptit`)
 
 ```bash
-# encrypt file → .enc | decrypt back
-encrypt: cryptit encrypt  <in> [-o out] [options]
-decrypt: cryptit decrypt  <in> [-o out] [options]
+# encrypt file → .enc
+cryptit encrypt  <in> [-o out] [options]
 
-encrypt text  : echo "secret" | cryptit encrypt-text  -p pw
-decrypt text  : echo "…b64…" | cryptit decrypt-text -p pw
+# decrypt back
+cryptit decrypt  <in> [-o out] [options]
+
+# encrypt text
+echo "secret" | cryptit encrypt-text  -p pw
+cryptit encrypt-text "secret" -d high -S 1 # -> Prompt for password, Argon2id difficulty "high" and Scheme 1
+
+# decrypt text
+echo "…b64…" | cryptit decrypt-text -p pw
 
 # inspect header (no decryption)
 cryptit decode movie.enc
@@ -161,7 +194,7 @@ echo "AQVWgYDH/rkR6Ymxv1W9NzFWTsvTTXsnEaLHPx+NlATmuwcqea5RlljX1ly16Px716I2yGX/Xs
 | ------------------------- | ------- | -------------------- |
 | `-p, --pass <pw>`         | prompt  | passphrase           |
 | `-d, --difficulty <l>`    | middle  | Argon2 preset        |
-| `-S, --scheme <0-1>. `    | 0.      | Scheme preset        |
+| `-S, --scheme <0-1>.`     | 0.      | Scheme preset        |
 | `-s, --salt-strength <l>` | high    | 12 B vs 16 B salt    |
 | `-c, --chunk-size <n>`    | 524 288 | plaintext block size |
 | `-v, --verbose`           |  0 … 4  | repeat to increase   |

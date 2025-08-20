@@ -35,7 +35,7 @@ describe.each(SCHEMES)('cryptit CLI ↔ browser-runtime (scheme %i)', scheme => 
     // mirror the same scheme in the browser-runtime
     const crypt  = new Cryptit(browserProvider, { scheme });
     const plain  = await crypt.decryptText(cipher, 'pw');
-    expect(plain).toBe('interop');
+    expect(plain.text).toBe('interop');
   });
 
   it('browser encrypt → `decrypt-text` (CLI)', async () => {
@@ -44,7 +44,7 @@ describe.each(SCHEMES)('cryptit CLI ↔ browser-runtime (scheme %i)', scheme => 
 
     // pass the scheme through to the CLI
     const plain  = await runCli([
-      'decrypt-text', cipher,
+      'decrypt-text', cipher.base64,
       '--pass', 'pw',
       '--scheme', scheme.toString(),
     ]);
@@ -63,7 +63,7 @@ describe.each(SCHEMES)('cryptit CLI ↔ browser-runtime (scheme %i)', scheme => 
 
     const encBuf = await fs.readFile(enc);
     const browserCrypt = new Cryptit(browserProvider, { scheme });
-    const decBlob      = await browserCrypt.decryptFile(new Blob([encBuf]), 'pw');
+    const decBlob      = await browserCrypt.decryptFile(new Blob([encBuf as BufferSource]), 'pw');
     const decBytes     = new Uint8Array(await decBlob.arrayBuffer());
 
     expect(decBytes).toEqual(srcBytes);

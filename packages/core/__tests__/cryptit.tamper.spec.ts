@@ -21,7 +21,7 @@ describe.each(SCHEMES)('Cryptit - ciphertext integrity guard (scheme %i)', schem
 
   it('decryptText() ⇒ throws DecryptionError on flipped payload bit', async () => {
     const b64   = await crypt.encryptText('tamper -probe', 'pw');
-    const raw   = base64Decode(b64);
+    const raw   = base64Decode(b64.base64);
     const { headerLen } = decodeHeader(raw);
     const bad   = flipBit(raw, headerLen + 3);
     await expect(crypt.decryptText(base64Encode(bad), 'pw'))
@@ -34,7 +34,7 @@ describe.each(SCHEMES)('Cryptit - ciphertext integrity guard (scheme %i)', schem
     const buf   = new Uint8Array(await enc.arrayBuffer());
     const { headerLen } = decodeHeader(buf);
     const tampered = flipBit(buf, headerLen + 1);
-    await expect(crypt.decryptFile(new Blob([tampered]), 'pw'))
+    await expect(crypt.decryptFile(new Blob([tampered as BufferSource]), 'pw'))
       .rejects.toThrow(DecryptionError);
   });
 

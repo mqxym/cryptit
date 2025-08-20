@@ -29,7 +29,7 @@ export class Argon2KDF implements KeyDerivation<'low' | 'middle' | 'high'> {
     if (this.exportExtractable) {
       return provider.subtle.importKey(
         'raw',
-        hash,
+        hash as BufferSource,
         { name: 'AES-GCM', length: 256 },
         true,
         ['encrypt', 'decrypt']
@@ -37,7 +37,7 @@ export class Argon2KDF implements KeyDerivation<'low' | 'middle' | 'high'> {
     } else {
       return provider.subtle.importKey(
         'raw',
-        hash,
+        hash as BufferSource,
         { name: 'AES-GCM', length: 256 },
         false,
         ['encrypt', 'decrypt']

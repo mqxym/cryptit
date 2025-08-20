@@ -24,7 +24,7 @@ describe.each(SCHEMES)('Cryptit - header tampering (scheme %i)', scheme => {
 
   it('decryptText() ⇒ throws DecryptionError when header info byte is tampered', async () => {
     const b64   = await crypt.encryptText('hdr-check', 'pw');
-    const raw   = base64Decode(b64);
+    const raw   = base64Decode(b64.base64);
 
     // Flip a bit in the header's info byte (index 1) without touching the body
     const tampered = flipBit(raw, 1, 0x01);
@@ -40,7 +40,7 @@ describe.each(SCHEMES)('Cryptit - header tampering (scheme %i)', scheme => {
     const buf       = new Uint8Array(await enc.arrayBuffer());
     const tampered  = flipBit(buf, 1, 0x04); // flip another bit in the info byte
 
-    await expect(crypt.decryptFile(new Blob([tampered]), 'pw'))
+    await expect(crypt.decryptFile(new Blob([tampered as BufferSource]), 'pw'))
       .rejects.toThrow(DecryptionError);
   });
 

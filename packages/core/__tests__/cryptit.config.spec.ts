@@ -19,10 +19,10 @@ describe('Cryptit configuration guards', () => {
   );
 
   /* ── scheme switching must not break legacy ciphertexts ────────── */
-  it('decrypts old scheme‑0 ciphertext after scheme switch', async () => {
+  it('decrypts old scheme-0 ciphertext after scheme switch', async () => {
     const cipher = await crypt.encryptText('legacy', 'pw');   // scheme 0
     crypt.setScheme(1);                                       // switch
-    const plain = await crypt.decryptText(cipher, 'pw');
-    expect(plain).toBe('legacy');
+    const plain = await crypt.decryptText(cipher.uint8array, 'pw');
+    expect(plain.text).toBe('legacy');
   });
 });
