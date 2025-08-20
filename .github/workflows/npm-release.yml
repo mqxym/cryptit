@@ -90,7 +90,7 @@ jobs:
           matrix.target }})
         uses: actions/upload-artifact@v4
         with:
-          name: cryptit-cli--${{ matrix.target }}${{ matrix.ext }}
+          name: cryptit-cli-${{ matrix.target }}${{ matrix.ext }}
           path: ${{ env.OUTDIR }}/cryptit-cli-${{ matrix.target }}${{ matrix.ext }}
 
   release:
@@ -133,7 +133,5 @@ jobs:
           with:
             registry-url: https://registry.npmjs.org/
             node-version: '20'
-        
-        - run: npm whoami
 
         - run: npm publish --access public --provenance
