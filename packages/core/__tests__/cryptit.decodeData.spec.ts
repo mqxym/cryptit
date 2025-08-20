@@ -5,9 +5,9 @@ describe('Cryptit.decodeData (payload inspector)', () => {
   const crypt = new Cryptit(nodeProvider);
 
   it('extracts IV + auth-tag from an encryptText payload', async () => {
-    const cipher = await crypt.encryptText('peek-iv', 'pw');
+    const cipher = (await crypt.encryptText('peek-iv', 'pw'));
 
-    const meta = await Cryptit.decodeData(cipher);
+    const meta = await Cryptit.decodeData(cipher.uint8array);
     expect(meta.isChunked).toBe(false);
     if (!meta.isChunked) {
       expect(meta.params.iv.byteLength).toBe(12);   // AES-GCM IV length

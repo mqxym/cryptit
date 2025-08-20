@@ -17,6 +17,7 @@ import { base64Encode, base64Decode, concat, zeroizeString } from './util/bytes.
 import { StreamProcessor }          from './stream/StreamProcessor.js';
 import { EncryptTransform }         from './stream/EncryptTransform.js';
 import { DecryptTransform }         from './stream/DecryptTransform.js';
+import { ConvertibleInput, ConvertibleOutput } from './util/Convertible.js';
 
 import {
   createLogger,
@@ -304,40 +305,50 @@ export class Cryptit {
   //  TEXT convenience
   // ════════════════════════════════════════════════════════════════════════
 
-  /**
-   * Encrypt plaintext (string or Uint8Array) and return Base64-encoded result.
-   * @param plain - Data to encrypt (text or bytes)
-   * @param pass - Passphrase for key derivation
-   * @returns Base64 string containing header and ciphertext
+    /**
+   * Encrypt plaintext and return a flexible output wrapper.
+   * @param plain - string | Uint8Array | ConvertibleInput
+   * @param pass  - passphrase (warning logged if empty)
+   * @returns ConvertibleOutput (read via .base64 / .hex / .uint8array)
    * @throws EncryptionError on failure
    */
-  async encryptText(plain: string | Uint8Array, pass: string): Promise<string> {
+  async encryptText(
+    plain: string | Uint8Array | ConvertibleInput,
+    pass: string,
+  ): Promise<ConvertibleOutput> {
     const secret = { value: pass };
 
     try {
+      if (pass === '') this.log.log(0, 'Empty passphrase provided to encryptText');
       this.log.log(1, `Start text encryption, scheme: ${this.getScheme()}`);
+
+      // Normalize input once; we’ll wipe after use
+      const inp = ConvertibleInput.from(plain);
+      const plainBytes = inp.toUint8Array();
+
       this.log.log(2, 'Deriving key for text encryption');
       const salt = this.genSalt();
       await this.deriveKey(secret, salt);
-      
+
       zeroizeString(secret);
       pass = null as any;
-      
-      this.log.log(3, `Salt generated: ${base64Encode(salt)}, KDF difficulty: ${this.difficulty}`);
 
+      this.log.log(3, `Salt generated: ${base64Encode(salt)}, KDF difficulty: ${this.difficulty}`);
       this.log.log(3, 'Encoding header');
+
       const header = encodeHeader(this.v.id, this.difficulty, this.saltStrength, salt, this.cipher);
 
       this.log.log(2, 'Encrypting text data');
-      const cipher = await this.cipher.encryptChunk(
-        typeof plain === 'string' ? new TextEncoder().encode(plain) : plain,
-      );
+      const cipher = await this.cipher.encryptChunk(plainBytes);
       this.cipher.zeroKey();
-      
-      this.log.log(3, 'Encoding text');
-      const result = base64Encode(header, cipher);
-      this.log.log(1, 'Decryption finished');
-      return result;
+
+      // wipe plaintext ASAP
+      try { inp.clear(); } catch {}
+
+      // Return a convertible output over the raw container bytes (header + cipher)
+      const container = concat(header, cipher);
+      this.log.log(1, 'Encryption finished');
+      return new ConvertibleOutput(container);
 
     } catch (err) {
       throw new EncryptionError(
@@ -347,44 +358,65 @@ export class Cryptit {
   }
 
   /**
-   * Decrypt a Base64-encoded ciphertext string using the provided passphrase.
-   * @param b64 - Base64 string containing header and ciphertext
-   * @param pass - Passphrase for key derivation
-   * @returns Decrypted plaintext string
-   * @throws DecryptionError on failure or invalid header
+   * Decrypt a ciphertext container and return a flexible output wrapper.
+   * @param data - Base64 string, Uint8Array, or ConvertibleInput of (header + ciphertext)
+   * @param pass - passphrase (warning logged if empty)
+   * @returns ConvertibleOutput over plaintext bytes (.text for UTF-8)
+   * @throws DecryptionError on failure
    */
-  async decryptText(b64: string, pass: string): Promise<string> {
+  async decryptText(
+    data: string | Uint8Array | ConvertibleInput,
+    pass: string,
+  ): Promise<ConvertibleOutput> {
     const secret = { value: pass };
+
     try {
+      if (pass === '') this.log.log(0, 'Empty passphrase provided to decryptText');
       this.log.log(1, `Start text decryption, Version ${this.getScheme()}`);
-      this.log.log(3, 'Start text decoding');
-      const data = base64Decode(b64);
+
+      // Normalize ciphertext container to bytes
+      let container: Uint8Array;
+      if (typeof data === 'string') {
+        this.log.log(3, 'Decoding Base64 ciphertext');
+        container = base64Decode(data);
+      } else if (data instanceof Uint8Array) {
+        container = data;
+      } else if (data instanceof ConvertibleInput) {
+        container = data.toUint8Array();
+      } else {
+        throw new DecodingError('Unsupported ciphertext input type');
+      }
+
       this.log.log(3, 'Start header decoding');
-      // First pass: parse meta without binding AAD anywhere
-      const hdr = decodeHeader(data);
+      const hdr = decodeHeader(container);
+
       this.log.log(3, 'Selecting decryption engine');
       const engine = EngineManager.getEngine(this.provider, hdr.scheme);
 
       this.log.log(2, `Deriving key via engine for scheme: ${hdr.scheme}`);
       this.log.log(3, `Salt use: ${base64Encode(hdr.salt)}, KDF difficulty: ${hdr.difficulty}`);
-      
+
       try {
         await EngineManager.deriveKey(engine, secret, hdr.salt, hdr.difficulty);
       } finally {
         zeroizeString(secret);
-         pass = null as any;
+        pass = null as any;
       }
 
       this.log.log(2, 'Decrypting text data');
-      decodeHeader(data, engine.cipher);
+      decodeHeader(container, engine.cipher); // bind AAD on actual cipher
       const plainBytes = await engine.cipher.decryptChunk(
-        data.slice(hdr.headerLen),
+        container.slice(hdr.headerLen),
       );
       engine.cipher.zeroKey();
-      this.log.log(3, 'Decoding text');
-      const text = new TextDecoder().decode(plainBytes);
+
+      // if input was a ConvertibleInput, wipe it
+      if (data instanceof ConvertibleInput) {
+        try { data.clear(); } catch {}
+      }
+
       this.log.log(1, 'Decryption finished');
-      return text;
+      return new ConvertibleOutput(plainBytes);
 
     } catch (err) {
       if (

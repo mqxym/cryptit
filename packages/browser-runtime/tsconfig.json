@@ -2,14 +2,14 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "composite": true,
-    "declarationDir": "../../build/browser-runtime",
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "declarationDir": "../../dist/types/browser-runtime",
     "rootDir": "src",
     "lib": ["ES2020", "DOM"],
     "target": "ES2020",
-    "tsBuildInfoFile": "../../build/browser-runtime/.tsbuildinfo"
+    "tsBuildInfoFile": "../../dist/types/.browser-runtime.tsbuildinfo"
   },
-  "include": ["src/**/*.ts"],
-  "references": [
-    { "path": "../core" }
-  ]
+  "include": ["src/**/*.ts", "src/**/*.d.ts"],
+  "references": [{ "path": "../core" }]
 }

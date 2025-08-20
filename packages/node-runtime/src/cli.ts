@@ -12,7 +12,7 @@ import { dirname , resolve, sep, isAbsolute} from 'node:path';
 import { toWebReadable, toWebWritable } from './streamAdapter.js';
 
 
-const PKG_VERSION = '1.3.0'; // sync with root package.json
+const PKG_VERSION = '2.1.0'; // sync with root package.json
 
 const DEFAULT_ROOT = process.cwd();
 
@@ -477,7 +477,7 @@ program
       })());
     const plain = text ?? (await readAllFromStdin());
     const cipher = await crypt.encryptText(plain, pass);
-    stdout.write(cipher + '\n');
+    stdout.write(cipher.base64 + '\n');
   });
 
 program
@@ -498,7 +498,7 @@ program
       processExit(1);
     }
     const plain = await crypt.decryptText(data, pass);
-    stdout.write(plain + '\n');
+    stdout.write(plain.text + '\n');
   });
 
 program.parse();

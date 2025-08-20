@@ -12,8 +12,8 @@ describe('browser-runtime facade', () => {
 
   it('encrypts & decrypts in a browser context', async () => {
     const cipher = await crypt.encryptText('Foo', 'pw');
-    const plain  = await crypt.decryptText(cipher, 'pw');
-    expect(plain).toBe('Foo');
+    const plain  = await crypt.decryptText(cipher.base64, 'pw');
+    expect(plain.text).toBe('Foo');
   });
 });
 
@@ -22,7 +22,7 @@ describe('browser-runtime | Scheme 1', () => {
 
   it('encrypts & decrypts in a browser context', async () => {
     const cipher = await crypt1.encryptText('Foo', 'pw');
-    const plain  = await crypt1.decryptText(cipher, 'pw');
-    expect(plain).toBe('Foo');
+    const plain  = await crypt1.decryptText(cipher.base64, 'pw');
+    expect(plain.text).toBe('Foo');
   });
 });

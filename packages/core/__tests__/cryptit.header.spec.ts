@@ -6,7 +6,7 @@ describe('Cryptit.headerDecode / isEncrypted helpers', () => {
 
   it('extracts meta-data from a Base64 payload', async () => {
     const cipher = await crypt.encryptText('meta-probe', 'pw');
-    const meta   = await Cryptit.headerDecode(cipher);
+    const meta   = await Cryptit.headerDecode(cipher.uint8array);
 
     expect(meta).toMatchObject({
       scheme    : crypt.getScheme(),

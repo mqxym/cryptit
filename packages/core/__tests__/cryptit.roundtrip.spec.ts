@@ -11,7 +11,7 @@ describe.each(SCHEMES)('Cryptit round-trip sanity (scheme %i)', scheme => {
 
   it('round trips text', async () => {
     const cipher = await crypt.encryptText('hello', 'secret');
-    expect(await crypt.decryptText(cipher, 'secret')).toBe('hello');
+    expect((await crypt.decryptText(cipher.uint8array, 'secret')).text).toBe('hello');
   });
 
   it('file round-trip', async () => {

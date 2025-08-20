@@ -20,7 +20,7 @@ export function decodeHeader(
   try {
     const info          = buf[1];
     const scheme        = info >> 5;
-    const saltStrength  = ((info >> 2) & 1) ? 'high' : 'low';
+    const saltStrength: 'low' | 'high' = ((info >> 2) & 1) ? 'high' : 'low';
     const diffCode      = info & 0b11;
     const difficulty    = (['low', 'middle', 'high'] as const)[diffCode];
     const saltLen       = SchemeRegistry.get(scheme).saltLengths[saltStrength];

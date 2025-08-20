@@ -19,6 +19,6 @@ describe('Cryptit - tiny payload round -trips', () => {
   it('single ASCII char encryptText round -trip (scheme 1)', async () => {
     const crypt = new Cryptit(nodeProvider, { scheme: 1 });
     const ciph  = await crypt.encryptText('X', 'pw');
-    expect(await crypt.decryptText(ciph, 'pw')).toBe('X');
+    expect((await crypt.decryptText(ciph.base64, 'pw')).text).toBe('X');
   });
 });

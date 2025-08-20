@@ -163,7 +163,9 @@
 
       try {
         const crypt = getCryptitInstance();
-        outputEl.value = await crypt.encryptText(inputEl.value, pass);
+        const output = await crypt.encryptText(inputEl.value, pass);
+        outputEl.value = output.base64;
+        output.clear();
       } catch (e) {
         const name = e.constructor.name;
         showError(e.message ?? String(e));
@@ -177,7 +179,9 @@
 
       try {
         const crypt = getCryptitInstance();
-        outputEl.value = await crypt.decryptText(inputEl.value.trim(), pass);
+        const output = await crypt.decryptText(inputEl.value.trim(), pass);
+        outputEl.value = output.text;
+        output.clear();
       } catch (e) {
         const name = e.constructor.name;
         showError(e.message ?? String(e));
