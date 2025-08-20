@@ -94,7 +94,6 @@ await Bun.spawn({
     "bun",
     "build",
     "--compile",
-    "--external=argon2-browser",
     `--outfile=${resolve(outdir, "bin", "cryptit")}`,
     "packages/node-runtime/src/cli.ts",
   ],

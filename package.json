@@ -21,7 +21,7 @@
     ],
     "main": "dist/cryptit.index.cjs",
     "module": "dist/cryptit.index.js",
-    "types": "dist/types/node-runtime/index.d.ts",
+    "types": "dist/types/node/node-runtime/index.d.ts",
     "files": [
         "dist/",
         "README.md",
@@ -61,12 +61,12 @@
     },
     "exports": {
         ".": {
-            "types": "./dist/types/node-runtime/index.d.ts",
+            "types": "./dist/types/node/node-runtime/index.d.ts",
             "import": "./dist/cryptit.index.js",
             "require": "./dist/cryptit.index.cjs"
         },
         "./browser": {
-            "types": "./dist/types/browser-runtime/index.d.ts",
+            "types": "./dist/types/browser/browser-runtime/index.d.ts",
             "import": "./dist/browser/cryptit.browser.min.js",
             "require": "./dist/browser/cryptit.browser.min.js"
         },

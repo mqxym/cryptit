@@ -4,7 +4,7 @@
     "composite": true,
     "declaration": true,
     "emitDeclarationOnly": true,
-    "declarationDir": "../../dist/core",
+    "declarationDir": "../../dist/types/core",
     "rootDir": ".",
     "tsBuildInfoFile": "../../dist/types/.core.tsbuildinfo"
   },
