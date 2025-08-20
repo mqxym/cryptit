@@ -8,7 +8,7 @@
 import { createCryptit } from '../src/index.js';
 
 describe('browser-runtime facade', () => {
-  const crypt = createCryptit({ chunkSize: 1024, verbose: 3 });
+  const crypt = createCryptit({ verbose: 3 });
 
   it('encrypts & decrypts in a browser context', async () => {
     const cipher = await crypt.encryptText('Foo', 'pw');
