@@ -26,6 +26,13 @@ The library can support up to 8 schemes via a header info byte (3 bit allocated)
 
 ---
 
+## Live Demo
+
+* Encryption / Decryption: [https://mqxym.github.io/cryptit/text-encryption.html](https://mqxym.github.io/cryptit/text-encryption.html)
+* Data Decoding [https://mqxym.github.io/cryptit/text-decoding.html](https://mqxym.github.io/cryptit/text-decoding.html)
+
+---
+
 ## Install
 
 ```bash
