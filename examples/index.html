@@ -12,7 +12,7 @@
   <script>
   //This needs to be done
   window.loadArgon2WasmBinary = () =>
-    fetch("/examples/assets/argon2.wasm")
+    fetch("./assets/argon2.wasm")
       .then(r => r.arrayBuffer())
       .then(buf => new Uint8Array(buf));
 
