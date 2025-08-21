@@ -87,12 +87,39 @@ jobs:
         env:
           BUN_INSTALL_CACHE_DIR: ${{ runner.temp }}/bun-cache
 
-      - name: Upload artifact (${{
-          matrix.target }})
+      - name: Archive binary (tar.gz on Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        env:
+          BIN: cryptit-cli-${{ matrix.target }}${{ matrix.ext }}
+        run: |
+          set -euo pipefail
+          pushd "${{ env.OUTDIR }}"
+          chmod +x "$BIN" || true
+          tar -czf "${BIN}.tar.gz" "$BIN"
+          popd
+
+      - name: Archive binary (zip on Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        env:
+          OUTDIR: ${{ env.OUTDIR }}
+          BIN: cryptit-cli-${{ matrix.target }}${{ matrix.ext }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $path = Join-Path $env:OUTDIR $env:BIN
+          # Ensure file exists, then zip it
+          if (!(Test-Path $path)) { throw "Binary not found: $path" }
+          Compress-Archive -Path $path -DestinationPath (Join-Path $env:OUTDIR ($env:BIN + ".zip")) -Force
+
+      - name: Upload artifact (${{ matrix.target }})
         uses: actions/upload-artifact@v4
         with:
-          name: cryptit-cli-${{ matrix.target }}${{ matrix.ext }}
-          path: ${{ env.OUTDIR }}/cryptit-cli-${{ matrix.target }}${{ matrix.ext }}
+          # Upload the archive we just made (zip on Windows, tar.gz elsewhere)
+          name: cryptit-cli-${{ matrix.target }}-archive
+          path: |
+            ${{ env.OUTDIR }}/cryptit-cli-${{ matrix.target }}${{ matrix.ext }}.tar.gz
+            ${{ env.OUTDIR }}/cryptit-cli-${{ matrix.target }}${{ matrix.ext }}.zip
 
   release:
     name: Upload to GitHub Release
@@ -105,10 +132,24 @@ jobs:
         with:
           path: dist
 
+      - name: Create SHA256SUMS.txt
+        run: |
+          cd dist
+          # Flatten any nested folders produced by download-artifact
+          find . -type f -name '*.tar.gz' -o -name '*.zip' -print0 | xargs -0 -I{} bash -c 'sha256sum "{}"'
+          # Write checksums file
+          { find . -type f -name '*.tar.gz' -print0; find . -type f -name '*.zip' -print0; } \
+            | xargs -0 sha256sum > SHA256SUMS.txt
+          echo "Generated checksums:"
+          cat SHA256SUMS.txt
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/**/*
+          files: |
+            dist/**/*.tar.gz
+            dist/**/*.zip
+            dist/SHA256SUMS.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
