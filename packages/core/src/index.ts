@@ -271,24 +271,28 @@ export class Cryptit {
    */
   setChunkSize(bytes: number): number {
      
-    const rawSize = bytes;
-    let size: number;
+      const MAX_ALLOWED_CHUNK_SIZE = 128 * 1024 * 1024; // 128 MiB
+      const rawSize = bytes;
+      let size: number;
 
-    if (rawSize == null) {
-      size = this.v.defaultChunkSize;
-    } else {
-      size = Number(rawSize);
-      if (!Number.isInteger(size) || size < 1) {
-        throw new Error(
-          `Invalid chunkSize: ${rawSize}. Must be a positive integer.`
-        );
+      if (rawSize == null) {
+        size = this.v.defaultChunkSize;
+      } else {
+        size = Number(rawSize);
+        if (!Number.isInteger(size) || size < 1) {
+          throw new Error(`Invalid chunkSize: ${rawSize}. Must be a positive integer.`);
+        }
+        if (size > MAX_ALLOWED_CHUNK_SIZE) {
+          throw new RangeError(`chunkSize cannot exceed ${MAX_ALLOWED_CHUNK_SIZE} bytes.`);
+        }
       }
-    }
 
-    // finally assign
-    this.chunkSize = size;
-    this.stream    = new StreamProcessor(this.cipher, this.chunkSize);
-    return size;
+      // finally assign
+      this.chunkSize = size;
+      if (this.stream) { // Check if stream is initialized
+          this.stream = new StreamProcessor(this.cipher, this.chunkSize);
+      }
+      return size;
   }
   /** Retrieve the current streaming chunk size. */
   getChunkSize(): number                     { return this.chunkSize; }
@@ -297,7 +301,7 @@ export class Cryptit {
    * Adjust verbosity level of internal logger at runtime.
    * @param level - Logger verbosity (0-4)
    */
-  setVerbose(level: Verbosity): void         { (this.log as any).level = level; }
+  setVerbose(level: Verbosity): void         { this.log.level = level; }
   /** Get the current logger verbosity setting. */
   getVerbose(): Verbosity                    { return this.log.level; }
 

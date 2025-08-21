@@ -136,6 +136,11 @@ await doBuild({
 // Post-build WASM handling
 const wasmSrc = join(outdirBrowser, "argon2.wasm");
 const wasmDst = join("examples", "assets", "argon2.wasm");
+
+const browserSrc = join(outdirBrowser, "cryptit.browser.min.js");
+const browserDst = join("examples", "assets", "cryptit.browser.min.js");
+
 copyFileSync(wasmSrc, wasmDst);
+copyFileSync(browserSrc, browserDst);
 
 console.log("All builds complete");
