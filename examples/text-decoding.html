@@ -2,13 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Cryptit Browser Demo – Header / Data Decoding</title>
+  <title>Cryptit Browser Demo - Header / Data Decoding</title>
   <link rel="icon" href="./favicon.ico" type="image/x-icon">
   <!-- Bootstrap 5 -->
   <link
     href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
     rel="stylesheet"
   >
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     textarea, pre { font-family: monospace; }
     pre { white-space: pre-wrap; word-break: break-all; }
@@ -51,7 +52,7 @@
     <!-- Input -->
     <div class="row mb-3">
       <div class="col-12">
-        <label for="cipherInput" class="form-label">Input (Base64 ciphertext / binary)</label>
+        <label for="cipherInput" class="form-label">Input (Base64 ciphertext)</label>
         <textarea id="cipherInput" class="form-control" rows="6"
           placeholder="Paste Cryptit-encrypted Base64 payload here"></textarea>
       </div>
@@ -104,7 +105,7 @@
     document.getElementById('headerBtn').addEventListener('click', async () => {
       clear();
       try {
-        const meta = await Cryptit.headerDecode(inp.value.trim());
+        const meta = await Cryptit.decodeHeader(inp.value.trim());
         pretty(meta);
       } catch (e) {
         showErr(e?.message ?? String(e));

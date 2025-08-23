@@ -12,7 +12,7 @@ import { dirname , resolve, sep, isAbsolute} from 'node:path';
 import { toWebReadable, toWebWritable } from './streamAdapter.js';
 
 
-const PKG_VERSION = '2.1.0'; // sync with root package.json
+const PKG_VERSION = '2.1.1'; // sync with root package.json
 
 const DEFAULT_ROOT = process.cwd();
 
@@ -197,7 +197,7 @@ program
       if (buf.length < 2) throw new Error('Input too short for header');
 
       const headSlice  = buf.subarray(0, Math.min(256, buf.length));
-      const headerMeta = await Cryptit.headerDecode(headSlice);
+      const headerMeta = await Cryptit.decodeHeader(headSlice);
 
       const dataMeta   = await Cryptit.decodeData(buf);
 
@@ -223,7 +223,7 @@ program
     /** Decode via random-access source (file or temp file) */
     async function decodeFromSource(src: FileByteSource): Promise<Record<string, unknown>> {
       const head        = await src.read(0, Math.min(256, src.length));
-      const headerMeta  = await Cryptit.headerDecode(head);
+      const headerMeta  = await Cryptit.decodeHeader(head);
       const dataMeta    = await Cryptit.decodeData(src);
 
       if (dataMeta.isChunked) {

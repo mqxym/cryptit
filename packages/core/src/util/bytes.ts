@@ -32,7 +32,7 @@ export function base64Encode(...chunks: Uint8Array[]): string {
 
     if (isNodeLike()) {
       // genuine Node / Bun
-      return (Buffer as any).from(data).toString('base64');
+      return Buffer.from(data).toString('base64');
     }
 
     // Browser (skip any injected Buffer polyfill)

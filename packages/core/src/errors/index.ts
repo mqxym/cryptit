@@ -1,13 +1,11 @@
-/* ------------------------------------------------------------------
-   Centralised error hierarchy - keeps stack traces out of user-space
-   ------------------------------------------------------------------ */
+const DISABLE_STACKTRACE : boolean = true;
 
 export class CryptitError extends Error {
   constructor(message: string) {
     super(message);
-    Object.setPrototypeOf(this, new.target.prototype);   // fix instanceof
+    Object.setPrototypeOf(this, new.target.prototype);
     this.name  = new.target.name;
-    this.stack = undefined;                              // no stack traces
+    if (DISABLE_STACKTRACE) this.stack = undefined;
   }
 }
 

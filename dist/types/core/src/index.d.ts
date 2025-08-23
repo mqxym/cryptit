@@ -80,12 +80,24 @@ export declare class Cryptit {
      * @param input - Base64 string, Uint8Array, or Blob to decode
      * @returns Object containing scheme, difficulty, salt (Base64), and salt length
      */
+    static decodeHeader(input: string | Uint8Array | Blob): Promise<{
+        scheme: number;
+        difficulty: Difficulty;
+        salt: string;
+        saltBytes: Uint8Array;
+        saltLength: number;
+    }>;
+    /**
+     * @deprecated Use `decodeHeader()` instead.
+     */
     static headerDecode(input: string | Uint8Array | Blob): Promise<{
         scheme: number;
         difficulty: Difficulty;
         salt: string;
+        saltBytes: Uint8Array;
         saltLength: number;
     }>;
+    static isRandomAccessSource(input: unknown): input is RandomAccessSource;
     /**
      * Inspect an encrypted payload and return either:
      *   • chunk statistics for file/stream containers
@@ -133,7 +145,7 @@ export declare class Cryptit {
    * @returns ConvertibleOutput (read via .base64 / .hex / .uint8array)
    * @throws EncryptionError on failure
    */
-    encryptText(plain: string | Uint8Array | ConvertibleInput, pass: string): Promise<ConvertibleOutput>;
+    encryptText(plain: string | Uint8Array | ConvertibleInput, pass: string | null): Promise<ConvertibleOutput>;
     /**
      * Decrypt a ciphertext container and return a flexible output wrapper.
      * @param data - Base64 string, Uint8Array, or ConvertibleInput of (header + ciphertext)
@@ -141,7 +153,7 @@ export declare class Cryptit {
      * @returns ConvertibleOutput over plaintext bytes (.text for UTF-8)
      * @throws DecryptionError on failure
      */
-    decryptText(data: string | Uint8Array | ConvertibleInput, pass: string): Promise<ConvertibleOutput>;
+    decryptText(data: string | Uint8Array | ConvertibleInput, pass: string | null): Promise<ConvertibleOutput>;
     /**
      * Encrypt a Blob (file) and return a new Blob with embedded header.
      * @param file - Input Blob to encrypt
@@ -149,7 +161,7 @@ export declare class Cryptit {
      * @returns Encrypted Blob (application/octet-stream)
      * @throws EncryptionError on failure
      */
-    encryptFile(file: Blob, pass: string): Promise<Blob>;
+    encryptFile(file: Blob, pass: string | null): Promise<Blob>;
     /**
      * Decrypt an encrypted Blob using the embedded header for parameters.
      * @param file - Encrypted Blob containing header + ciphertext
@@ -157,19 +169,19 @@ export declare class Cryptit {
      * @returns Decrypted Blob (application/octet-stream)
      * @throws DecryptionError on failure or invalid header
      */
-    decryptFile(file: Blob, pass: string): Promise<Blob>;
+    decryptFile(file: Blob, pass: string | null): Promise<Blob>;
     /**
      * Initialize streaming encryption, returning header and transform streams.
      * @param pass - Passphrase for key derivation
      * @returns Streams and header for real-time encryption
      */
-    createEncryptionStream(pass: string): Promise<EncryptStreamResult>;
+    createEncryptionStream(pass: string | null): Promise<EncryptStreamResult>;
     /**
      * Create a TransformStream for decrypting incoming ciphertext with header auto-detection.
-     * @param passp - Passphrase for key derivation
+     * @param pass - Passphrase for key derivation
      * @returns TransformStream encrypting Uint8Array chunks to Uint8Array plaintext chunks
      */
-    createDecryptionStream(pass: string): Promise<TransformStream<Uint8Array, Uint8Array>>;
+    createDecryptionStream(pass: string | null): Promise<TransformStream<Uint8Array, Uint8Array>>;
     /**
      * Derive cryptographic key from passphrase and salt using configured KDF.
      * @param pass - Passphrase to derive key from
