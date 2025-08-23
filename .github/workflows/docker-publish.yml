@@ -5,6 +5,17 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - '.github/workflows/docker-publish.yml'
+      - 'packages/**/src/**'
+      - 'packages/**/package.json'
+      - 'packages/**/tsconfig.json'
+      - 'package.json'
+      - 'bun.build.js'
+      - 'bun.lock'
+    
   workflow_dispatch:
  
 permissions:
@@ -46,7 +57,6 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/cryptit-cli:latest
             ghcr.io/${{ github.repository_owner }}/cryptit-cli:${{ env.VERSION }}
-            ghcr.io/${{ github.repository_owner }}/cryptit-cli:${{ github.sha }}
 
 
       - name: Confirm pushed image
