@@ -12,7 +12,7 @@ import { dirname , resolve, sep, isAbsolute} from 'node:path';
 import { toWebReadable, toWebWritable } from './streamAdapter.js';
 
 
-const PKG_VERSION = '2.1.1'; // sync with root package.json
+const PKG_VERSION = '2.1.2'; // sync with root package.json
 
 const DEFAULT_ROOT = process.cwd();
 
@@ -50,11 +50,11 @@ async function promptPass(): Promise<string> {
 function assertWritable(out: string, root: string = DEFAULT_ROOT) {
   if (out === '-') return;
 
-  const absRoot    = realpathSync(root);
+  const absRoot   = realpathSync(root);
 
- const absOut     = isAbsolute(out)
-                     ? resolve(out)
-                    : resolve(absRoot, out);
+  const absOut    = isAbsolute(out)
+                  ? resolve(out)
+                  : resolve(absRoot, out);
 
   const targetDir  = dirname(absOut);
   const realTarget = realpathSync(targetDir);

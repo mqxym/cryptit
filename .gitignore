@@ -7,3 +7,4 @@ dist/bin/cryptit
 scan*.md
 *.enc
 *.mp4
+local-compiled/

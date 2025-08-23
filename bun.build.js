@@ -94,7 +94,7 @@ await Bun.spawn({
     "bun",
     "build",
     "--compile",
-    `--outfile=${resolve(outdir, "bin", "cryptit")}`,
+    `--outfile=${resolve("local-compiled", "bin", "cryptit")}`,
     "packages/node-runtime/src/cli.ts",
   ],
 });
