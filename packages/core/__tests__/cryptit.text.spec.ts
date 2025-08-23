@@ -3,6 +3,7 @@ import { nodeProvider } from '../../node-runtime/src/provider.js';
 import { DecryptionError } from '../src/errors/index.js';
 import { browserProvider } from '../../browser-runtime/src/provider.js';
 import type { CryptoProvider } from '../src/providers/CryptoProvider.js';
+import { EncryptionError } from '../src/errors/index.js';
 import { SCHEMES } from './test.constants.js';
 
 describe.each(SCHEMES)('Cryptit text helpers (scheme %i)', scheme => {
@@ -76,5 +77,14 @@ describe.each(SCHEMES)('Cryptit text helpers extras (scheme %i)', scheme => {
     crypt.setScheme(1);
     const cipher = await crypt.encryptText('scheme-1', 'pw');
     expect((await crypt.decryptText(cipher.base64, 'pw')).text).toBe('scheme-1');
+  });
+
+
+  it('throws EncryptionError with password null', async () => {
+    crypt.setScheme(1);
+
+    await expect(
+      crypt.encryptText('scheme-1', null)
+    ).rejects.toThrow(EncryptionError);
   });
 });

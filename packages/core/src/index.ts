@@ -140,18 +140,38 @@ export class Cryptit {
    * @param input - Base64 string, Uint8Array, or Blob to decode
    * @returns Object containing scheme, difficulty, salt (Base64), and salt length
    */
-  static async headerDecode(
+  static async decodeHeader(
     input: string | Uint8Array | Blob,
-  ): Promise<{ scheme: number; difficulty: Difficulty; salt: string; saltLength: number; }> {
+  ): Promise<{ scheme: number; difficulty: Difficulty; salt: string; saltBytes: Uint8Array; saltLength: number; }> {
     const hdr = await Cryptit.peekHeader(input);
     const h   = decodeHeader(hdr);
     return {
       scheme    : h.scheme,
       difficulty : h.difficulty,
       salt       : base64Encode(h.salt),
+      saltBytes  : h.salt,
       saltLength : h.salt.byteLength,
     };
+  } 
+  
+  /**
+   * @deprecated Use `decodeHeader()` instead.
+   */
+  static async headerDecode(
+    input: string | Uint8Array | Blob,
+  ): Promise<{ scheme: number; difficulty: Difficulty; salt: string; saltBytes: Uint8Array; saltLength: number; }> {
+    return this.decodeHeader(input);
   }
+
+ static isRandomAccessSource(
+  input: unknown
+): input is RandomAccessSource {
+  return (
+    typeof input === "object" &&
+    input !== null &&
+    typeof (input as RandomAccessSource).read === "function"
+  );
+}
 
   /**
    * Inspect an encrypted payload and return either:
@@ -164,9 +184,9 @@ export class Cryptit {
     input: string | Uint8Array | Blob | RandomAccessSource,
   ): Promise<DecodeDataResult> {
     /* normalise into a random-access reader */
-    const src: RandomAccessSource = typeof (input as any)?.read === 'function'
-      ? (input as RandomAccessSource)
-      : new ByteSource(input as string | Uint8Array | Blob);
+    const src: RandomAccessSource = Cryptit.isRandomAccessSource(input)
+    ? input
+    : new ByteSource(input);
     const headSlice = await src.read(0, Math.min(256, src.length));
     const header    = await Cryptit.peekHeader(headSlice);
     const { scheme, headerLen } = decodeHeader(header);
@@ -318,8 +338,11 @@ export class Cryptit {
    */
   async encryptText(
     plain: string | Uint8Array | ConvertibleInput,
-    pass: string,
+    pass: string | null,
   ): Promise<ConvertibleOutput> {
+
+    if (pass === null) throw new EncryptionError("Password can't be null");
+ 
     const secret = { value: pass };
 
     try {
@@ -335,7 +358,7 @@ export class Cryptit {
       await this.deriveKey(secret, salt);
 
       zeroizeString(secret);
-      pass = null as any;
+      pass = null;
 
       this.log.log(3, `Salt generated: ${base64Encode(salt)}, KDF difficulty: ${this.difficulty}`);
       this.log.log(3, 'Encoding header');
@@ -370,8 +393,11 @@ export class Cryptit {
    */
   async decryptText(
     data: string | Uint8Array | ConvertibleInput,
-    pass: string,
+    pass: string | null,
   ): Promise<ConvertibleOutput> {
+    
+    if (pass === null) throw new EncryptionError("Password can't be null");
+ 
     const secret = { value: pass };
 
     try {
@@ -404,7 +430,7 @@ export class Cryptit {
         await EngineManager.deriveKey(engine, secret, hdr.salt, hdr.difficulty);
       } finally {
         zeroizeString(secret);
-        pass = null as any;
+        pass = null;
       }
 
       this.log.log(2, 'Decrypting text data');
@@ -447,7 +473,10 @@ export class Cryptit {
    * @returns Encrypted Blob (application/octet-stream)
    * @throws EncryptionError on failure
    */
-  async encryptFile(file: Blob, pass: string): Promise<Blob> {
+  async encryptFile(file: Blob, pass: string | null): Promise<Blob> {
+    
+    if (pass === null) throw new EncryptionError("Password can't be null");
+ 
     const secret = { value: pass };
     try {
 
@@ -456,7 +485,7 @@ export class Cryptit {
         await this.deriveKey(secret, salt);
 
         zeroizeString(secret);
-        pass = null as any;
+        pass = null;
 
         const header = encodeHeader(
           this.v.id,
@@ -472,7 +501,7 @@ export class Cryptit {
       await this.deriveKey(secret, salt);
 
       zeroizeString(secret);
-      pass = null as any;
+      pass = null;
 
       const header = encodeHeader(this.v.id, this.difficulty, this.saltStrength, salt, this.stream.getEngine());
 
@@ -501,7 +530,11 @@ export class Cryptit {
    * @returns Decrypted Blob (application/octet-stream)
    * @throws DecryptionError on failure or invalid header
    */
-  async decryptFile(file: Blob, pass: string): Promise<Blob> {
+  async decryptFile(file: Blob, pass: string | null): Promise<Blob> {
+    
+    if (pass === null) throw new EncryptionError("Password can't be null");
+ 
+
     const secret = { value: pass };
     try {
       const header = await Cryptit.peekHeader(file);
@@ -513,7 +546,7 @@ export class Cryptit {
         await EngineManager.deriveKey(engine, secret, parsed.salt, parsed.difficulty);
       } finally {
         zeroizeString(secret);
-        pass = null as any;
+        pass = null;
       }
 
       // ── 0-byte optimisation ────────────────────────────────────────
@@ -549,7 +582,10 @@ export class Cryptit {
    * @param pass - Passphrase for key derivation
    * @returns Streams and header for real-time encryption
    */
-  async createEncryptionStream(pass: string): Promise<EncryptStreamResult> {
+  async createEncryptionStream(pass: string | null): Promise<EncryptStreamResult> {
+    
+    if (pass === null) throw new EncryptionError("Password can't be null");
+ 
     const secret = { value: pass };
 
     this.log.log(2, 'Deriving key for stream encryption');
@@ -557,7 +593,7 @@ export class Cryptit {
     await this.deriveKey(secret, salt);
 
     zeroizeString(secret);
-    pass = null as any;
+    pass = null;
 
     const header = encodeHeader(this.v.id, this.difficulty, this.saltStrength, salt, this.stream.getEngine());
     const tf     = this.stream.encryptionStream();
@@ -570,129 +606,121 @@ export class Cryptit {
      ────────────────────────────────────────────────────────── */
   /**
    * Create a TransformStream for decrypting incoming ciphertext with header auto-detection.
-   * @param passp - Passphrase for key derivation
+   * @param pass - Passphrase for key derivation
    * @returns TransformStream encrypting Uint8Array chunks to Uint8Array plaintext chunks
    */
   async createDecryptionStream(
-  pass: string,
-): Promise<TransformStream<Uint8Array, Uint8Array>> {
-  const secret = { value: pass };
+    pass: string | null,
+  ): Promise<TransformStream<Uint8Array, Uint8Array>> {
+    if (pass === null) throw new EncryptionError("Password can't be null");
 
-  const self = this;
-  let buf: Uint8Array = new Uint8Array(0);
-  let downstream: TransformStream<Uint8Array, Uint8Array> | null = null;
+    // Capture only what you need from `this`
+    const provider = this.provider;
 
-  // DOS guard: never buffer more than this while waiting for a header
-  const MAX_HEADER_PREFIX = 64 * 1024;
-  const MIN_HEADER_BYTES  = 2 + 12;
+    const secret = { value: pass };
+    let buf: Uint8Array = new Uint8Array(0);
+    let downstream: TransformStream<Uint8Array, Uint8Array> | null = null;
 
-  async function pipeOut(
-    readable: ReadableStream<Uint8Array>,
-    ctl: TransformStreamDefaultController<Uint8Array>,
-  ) {
-    const rd = readable.getReader();
-    while (true) {
-      const { value, done } = await rd.read();
-      if (done) break;
-      ctl.enqueue(value!);
-    }
-  }
+    const MAX_HEADER_PREFIX = 64 * 1024;
+    const MIN_HEADER_BYTES  = 2 + 12;
 
-  return new TransformStream<Uint8Array, Uint8Array>({
-    async transform(chunk, ctl) {
-      if (!downstream) {
-        // Append with a strict upper bound to prevent unbounded growth
-        if (chunk && chunk.byteLength) {
-          if (buf.byteLength + chunk.byteLength > MAX_HEADER_PREFIX) {
+    // Arrow => no `this` surprises
+    const pipeOut = async (
+      readable: ReadableStream<Uint8Array>,
+      ctl: TransformStreamDefaultController<Uint8Array>,
+    ) => {
+      const rd = readable.getReader();
+      while (true) {
+        const { value, done } = await rd.read();
+        if (done) break;
+        ctl.enqueue(value!);
+      }
+    };
+
+    return new TransformStream<Uint8Array, Uint8Array>({
+      transform: async (chunk, ctl) => {
+        if (!downstream) {
+          if (chunk && chunk.byteLength) {
+            if (buf.byteLength + chunk.byteLength > MAX_HEADER_PREFIX) {
+              zeroizeString(secret);
+              ctl.error(new InvalidHeaderError(
+                `Header not found within ${MAX_HEADER_PREFIX} bytes`,
+              ));
+              return;
+            }
+            buf = concat(buf, chunk);
+          }
+
+          if (buf.byteLength < MIN_HEADER_BYTES) return;
+
+          const info         = buf[1];
+          const scheme       = info >> 5;
+          const saltStrength = ((info >> 2) & 1) ? 'high' : 'low';
+
+          let hdrLen = 0;
+          try {
+            const desc = SchemeRegistry.get(scheme);
+            const sLen = desc.saltLengths[saltStrength as 'low' | 'high'];
+            hdrLen     = 2 + sLen;
+          } catch (e) {
             zeroizeString(secret);
-            ctl.error(new InvalidHeaderError(
-              `Header not found within ${MAX_HEADER_PREFIX} bytes`,
+            ctl.error(new HeaderDecodeError(
+              e instanceof Error ? e.message : String(e),
             ));
             return;
           }
-          buf = concat(buf, chunk);
-        }
 
-        // Not enough to even hold the smallest header — keep buffering
-        if (buf.byteLength < MIN_HEADER_BYTES) return;
+          if (buf.byteLength < hdrLen) return;
 
-        // We can now safely read the info byte
-        const info         = buf[1];
-        const scheme       = info >> 5;
-        const saltStrength = ((info >> 2) & 1) ? 'high' : 'low';
+          const headerBytes = buf.subarray(0, hdrLen);
+          let parsed: ReturnType<typeof decodeHeader>;
+          try {
+            parsed = decodeHeader(headerBytes);
+          } catch (err) {
+            zeroizeString(secret);
+            ctl.error(err instanceof Error ? err : new HeaderDecodeError('Invalid header'));
+            return;
+          }
 
-        // Determine expected header length; if scheme is unknown, fail
-        let hdrLen = 0;
-        try {
-          const desc  = SchemeRegistry.get(scheme);
-          const sLen  = desc.saltLengths[saltStrength as 'low' | 'high'];
-          hdrLen      = 2 + sLen;
-        } catch (e) {
-          zeroizeString(secret);
-          ctl.error(new HeaderDecodeError(
-            e instanceof Error ? e.message : String(e),
-          ));
+          const engine = EngineManager.getEngine(provider, parsed.scheme);
+          try {
+            await EngineManager.deriveKey(engine, secret, parsed.salt, parsed.difficulty);
+          } finally {
+            zeroizeString(secret);
+            pass = null;
+          }
+
+          decodeHeader(headerBytes, engine.cipher); // Assign authenticated data to engine.cipher
+
+          downstream = new DecryptTransform(engine.cipher, engine.chunkSize).toTransformStream();
+          void pipeOut(downstream.readable, ctl).catch(err => ctl.error(err));
+
+          const remainder = buf.subarray(hdrLen);
+          buf = new Uint8Array(0);
+          if (remainder.byteLength) {
+            const w = downstream.writable.getWriter();
+            await w.write(remainder);
+            w.releaseLock();
+          }
           return;
         }
 
-        // Wait until the full header is available
-        if (buf.byteLength < hdrLen) return;
+        const writer = downstream.writable.getWriter();
+        await writer.write(chunk);
+        writer.releaseLock();
+      },
 
-        // Parse header bytes precisely; get salt & difficulty
-        const headerBytes = buf.subarray(0, hdrLen);
-        let parsed: ReturnType<typeof decodeHeader>;
-        try {
-          parsed = decodeHeader(headerBytes);
-        } catch (err) {
+      flush: async () => {
+        if (!downstream) {
           zeroizeString(secret);
-          ctl.error(err instanceof Error ? err : new HeaderDecodeError('Invalid header'));
-          return;
+          throw new InvalidHeaderError('Header not found before end of stream');
         }
-
-        // Prepare engine & key
-        const engine = EngineManager.getEngine(self.provider, parsed.scheme);
-        try {
-          await EngineManager.deriveKey(engine, secret, parsed.salt, parsed.difficulty);
-        } finally {
-          zeroizeString(secret);
-          pass = null as any;
-        }
-
-        // Bind the exact header bytes as AAD on the *actual* cipher
-        decodeHeader(headerBytes, engine.cipher);
-
-        // Switch to decryption pipeline
-        downstream = new DecryptTransform(engine.cipher, engine.chunkSize).toTransformStream();
-        void pipeOut(downstream.readable, ctl).catch(err => ctl.error(err));
-
-        // Push any buffered ciphertext after the header downstream, then release buffer
-        const remainder = buf.subarray(hdrLen);
-        buf = new Uint8Array(0);
-        if (remainder.byteLength) {
-          const w = downstream.writable.getWriter();
-          await w.write(remainder);
-          w.releaseLock();
-        }
-        return;
-      }
-
-      // Already initialised: just forward chunks
-      const writer = downstream.writable.getWriter();
-      await writer.write(chunk);
-      writer.releaseLock();
-    },
-
-    async flush() {
-      if (!downstream) {
-        zeroizeString(secret);
-        throw new InvalidHeaderError('Header not found before end of stream');
-      }
-      const writer = downstream.writable.getWriter();
-      await writer.close();
-      writer.releaseLock();
-    },
-  });
-}
+        const writer = downstream.writable.getWriter();
+        await writer.close();
+        writer.releaseLock();
+      },
+    });
+  }
 
   // ════════════════════════════════════════════════════════════════════════
   //  Helpers
@@ -726,7 +754,7 @@ export class Cryptit {
 
   /** Generate a secure random salt according to configured length. */
   private genSalt<S extends SaltStrength>(strength: S = this.saltStrength as S): Uint8Array {
-    const len = this.v.saltLengths[this.saltStrength];
+    const len = this.v.saltLengths[strength];
     return this.provider.getRandomValues(new Uint8Array(len));
   }
 

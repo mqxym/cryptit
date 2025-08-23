@@ -1,5 +1,6 @@
 import { Cryptit }      from '../src/index.js';
 import { nodeProvider } from '../../node-runtime/src/provider.js';
+import { EncryptionError } from '../src/errors/index.js';
 
 const randomBlob = (bytes: number) =>
   new Blob([crypto.getRandomValues(new Uint8Array(bytes))]);
@@ -46,4 +47,15 @@ describe('Cryptit file helpers - extra cases', () => {
     const empty = new Blob([]);
     await expect(crypt.encryptFile(empty, 'pw')).resolves.toBeInstanceOf(Blob);
   });
+
+  it('throws EncryptionError with password null', async () => {
+    const crypt = new Cryptit(nodeProvider);
+    crypt.setScheme(1);
+    const empty = new Blob([])
+
+    await expect(
+      crypt.encryptFile(empty, null)
+    ).rejects.toThrow(EncryptionError);
+
+    });
 });

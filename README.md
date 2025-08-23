@@ -151,7 +151,8 @@ c.setSaltDifficulty("low");
 
 // HELPERS
 Cryptit.isEncrypted(blobOrB64);   // ↦ boolean
-Cryptit.headerDecode(blobOrB64);  // ↦ meta {scheme, salt, …}
+Cryptit.decodeHeader(blobOrB64);  // ↦ meta {scheme, salt, …}
+Cryptit.decodeData(blobOrB64);  // ↦ {isChunked, ivLength, tagLength, iv, tag, …}
 ```
 
 Verbose levels:
@@ -182,7 +183,7 @@ cryptit encrypt-text "secret" -d high -S 1 # -> Prompt for password, Argon2id di
 # decrypt text
 echo "…b64…" | cryptit decrypt-text -p pw
 
-# inspect header (no decryption)
+# inspect header, chunk and text details of Cryptit-encrypted payloads (no decryption)
 cryptit decode movie.enc
 cat movie.enc | cryptit decode
 ```
