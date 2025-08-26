@@ -30,7 +30,7 @@ await doBuild({
   outdir: outdir,
   minify: true,
   format: "esm",
-  external: ["argon2-browser"],
+  external: ["argon2-browser", "@node-rs/argon2"],
   target: "node",
   naming: {
     entry: "cryptit.index.[ext]",
@@ -46,7 +46,7 @@ await doBuild({
   outdir: outdir,
   minify: true,
   format: "cjs",
-  external: ["argon2-browser"],
+  external: ["argon2-browser", "@node-rs/argon2"],
   target: "node",
   naming: {
     entry: "cryptit.index.cjs",
@@ -62,7 +62,7 @@ await doBuild({
   outdir: outdirCLI,
   minify: true,
   format: "cjs",
-  external: ["argon2-browser"],
+  external: ["argon2-browser", "@node-rs/argon2"],
   target: "node",
   naming: {
     entry: "cryptit.cli.cjs",
@@ -78,7 +78,7 @@ await doBuild({
   outdir: outdirCLI,
   minify: true,
   format: "esm",
-  external: ["argon2-browser"],
+  external: ["argon2-browser", "@node-rs/argon2"],
   target: "node",
   naming: {
     entry: "cryptit.cli.[ext]",
@@ -105,7 +105,7 @@ await doBuild({
   outdir: outdirBrowser,
   minify: true,
   format: "esm",
-  external: ["commander", "buffer", "process", "argon2"],
+  external: ["commander", "buffer", "process", "@node-rs/argon2"],
   target: "browser",
   naming: {
     entry: "cryptit.browser.min.[ext]",

@@ -76,22 +76,24 @@ export async function argon2id(
 ): Promise<ArgonHash> {
   // ————————————————————————————  Node / Bun  ————————————————————————————
   if (env === 'node') {
-    const argon2 = await import('argon2');
+    const argon2 = await import("@node-rs/argon2");
     const pwdBuf = typeof password === 'string' ? Buffer.from(password, 'utf8') : Buffer.from(password);
 
-    const saltBuf = Buffer.from(salt);
 
-    const raw: Buffer = await argon2.hash(pwdBuf, {
-      salt: saltBuf,
+    const hashString: string = await argon2.hash(pwdBuf, {
+      salt,
       timeCost: opts.time,
       memoryCost: opts.mem,
       parallelism: opts.parallelism,
-      hashLength: 32,
-      raw: true,
-      type: argon2.argon2id,
+      outputLen: 32,
+      algorithm: argon2.Algorithm.Argon2id,
     });
+
+    const digestBase64 = hashString.split("$").pop();
+    if (!digestBase64) throw new Error("Unexpected argon2 hash format");
+
+    const raw = Buffer.from(digestBase64, "base64");
     
-    saltBuf.fill(0);
     pwdBuf.fill(0);
 
     return { hash: new Uint8Array(raw) };
