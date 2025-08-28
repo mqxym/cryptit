@@ -12,7 +12,7 @@ import { dirname , resolve, sep, isAbsolute} from 'node:path';
 import { toWebReadable, toWebWritable } from './streamAdapter.js';
 
 
-const PKG_VERSION = '2.1.3'; // sync with root package.json
+const PKG_VERSION = '2.1.4'; // sync with root package.json
 
 const DEFAULT_ROOT = process.cwd();
 
@@ -372,6 +372,7 @@ program
 program
   .command('encrypt <src>')
   .description('Encrypt file; use - for STDIN, --out - for STDOUT')
+  .option('-p, --pass <passphrase>', 'passphrase (prompt if omitted)')
   .option('-o, --out <file>', 'output file (default STDOUT)', '-')
   .action(async (src, cmd) => {
     if (src !== '-' && !existsSync(src)) {
@@ -423,6 +424,7 @@ program
 program
   .command('decrypt <src>')
   .description('Decrypt file; use - for STDIN, --out - for STDOUT')
+  .option('-p, --pass <passphrase>', 'passphrase (prompt if omitted)')
   .option('-o, --out <file>', 'output file (default STDOUT)', '-')
   .action(async (src, cmd) => {
     
@@ -465,6 +467,7 @@ program
 program
   .command('encrypt-text [text]')
   .description('Encrypt plaintext; omit arg to read from STDIN')
+  .option('-p, --pass <passphrase>', 'passphrase (prompt if omitted)')
   .action(async (text) => {
     const opts  = program.opts();
     const crypt = createCryptit({
@@ -487,6 +490,7 @@ program
 program
   .command('decrypt-text [b64]')
   .description('Decrypt Base64 ciphertext; omit arg to read from STDIN')
+  .option('-p, --pass <passphrase>', 'passphrase (prompt if omitted)')
   .action(async (b64) => {
     const opts  = program.opts();
     const crypt = createCryptit({
@@ -506,3 +510,7 @@ program
   });
 
 program.parse();
+
+if (!process.argv.slice(2).length) {
+  program.outputHelp();
+}
