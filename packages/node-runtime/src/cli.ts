@@ -516,4 +516,4 @@ if (process.argv.length <= 2) {
   process.exit(1);
 }
 
-await program.parseAsync();
+program.parse();
