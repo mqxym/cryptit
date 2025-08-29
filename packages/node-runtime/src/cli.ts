@@ -12,7 +12,7 @@ import { dirname , resolve, sep, isAbsolute} from 'node:path';
 import { toWebReadable, toWebWritable } from './streamAdapter.js';
 
 
-const PKG_VERSION = '2.1.4'; // sync with root package.json
+const PKG_VERSION = '2.1.5'; // sync with root package.json
 
 const DEFAULT_ROOT = process.cwd();
 
@@ -88,6 +88,8 @@ program
   .name('cryptit')
   .version(PKG_VERSION)
   .description('Text and File Encryption Utility\n' + 'Scheme 0: AES-GCM (Native) / Argon2id (Single Thread)\n' +'Scheme 1: XChaCha20-Poly1305 (JS Engine) / Argon2id (Parallel)')
+  .showHelpAfterError()
+  .showSuggestionAfterError()
 
   .addOption(
     new Option('-S, --scheme <0-1>', 'encryption scheme version')
@@ -509,8 +511,9 @@ program
     stdout.write(plain.text + '\n');
   });
 
-program.parse();
-
-if (!process.argv.slice(2).length) {
+if (process.argv.length <= 2) {
   program.outputHelp();
+  process.exit(1);
 }
+
+await program.parseAsync();
