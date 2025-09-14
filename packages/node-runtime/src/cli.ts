@@ -12,7 +12,7 @@ import { dirname , resolve, sep, isAbsolute} from 'node:path';
 import { toWebReadable, toWebWritable } from './streamAdapter.js';
 
 
-const PKG_VERSION = '2.1.5'; // sync with root package.json
+const PKG_VERSION = '2.1.6'; // sync with root package.json
 
 const DEFAULT_ROOT = process.cwd();
 
