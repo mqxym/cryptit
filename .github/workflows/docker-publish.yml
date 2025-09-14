@@ -63,7 +63,7 @@ jobs:
         run: echo "ghcr.io/${{ github.repository_owner }}/cryptit-cli@sha256:${{ steps.publish.outputs.digest }}"
 
       - name: Install Trivy
-        uses: aquasecurity/setup-trivy@v0.2.3
+        uses: aquasecurity/setup-trivy@v0.2.4
         with:
           version: 'latest'
           cache: true
