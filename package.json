@@ -1,6 +1,6 @@
 {
     "name": "@mqxym/cryptit",
-    "version": "2.1.6",
+    "version": "2.1.7",
     "repository": "https://github.com/mqxym/cryptit",
     "description": "Modern, cross-platform AES-GCM 256 / XChaCha20Poly1305 + Argon2-id encryption for files and text.",
     "type": "module",
@@ -51,11 +51,11 @@
         "@node-rs/argon2": "^2.0.2"
     },
     "devDependencies": {
-        "@types/bun": "^1.2.19",
+        "@types/bun": "1.2.22",
         "@types/jest": "^30.0.0",
         "@types/node": "^24.3.0",
-        "@typescript-eslint/eslint-plugin": "^8.40.0",
-        "@typescript-eslint/parser": "^8.39.0",
+        "@typescript-eslint/eslint-plugin": "8.44.0",
+        "@typescript-eslint/parser": "8.44.0",
         "eslint": "^9.34.0",
         "execa": "^9.6.0",
         "ts-node": "^10.9.2",
