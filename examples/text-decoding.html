@@ -84,49 +84,65 @@
 
   <!-- Demo logic -->
   <script type="module">
-    const { Cryptit }  = window;
-    const inp   = document.getElementById('cipherInput');
-    const out   = document.getElementById('resultBox');
-    const err   = document.getElementById('errBox');
+    const { Cryptit } = window;
 
+    // Shortcuts
+    const $ = (id) => document.getElementById(id);
+    const els = {
+      inp: $('cipherInput'),
+      out: $('resultBox'),
+      err: $('errBox'),
+      headerBtn: $('headerBtn'),
+      dataBtn: $('dataBtn'),
+    };
+
+    // UI helpers
     function showErr(msg) {
-      err.textContent = msg;
-      err.classList.remove('d-none');
+      els.err.textContent = msg || 'Something went wrong.';
+      els.err.classList.remove('d-none');
     }
-    function clear() {
-      err.classList.add('d-none');
-      err.textContent = '';
-      out.textContent = '';
+    function clearUI() {
+      els.err.textContent = '';
+      els.err.classList.add('d-none');
+      els.out.textContent = '';
     }
     function pretty(obj) {
-      out.textContent = JSON.stringify(obj, null, 2);
+      els.out.textContent = JSON.stringify(obj, null, 2);
     }
 
-    document.getElementById('headerBtn').addEventListener('click', async () => {
-      clear();
+    // Actions
+    async function decodeHeader() {
+      clearUI();
       try {
-        const meta = await Cryptit.decodeHeader(inp.value.trim());
+        const meta = await Cryptit.decodeHeader(els.inp.value.trim());
+        delete meta.saltBytes;
         pretty(meta);
       } catch (e) {
         showErr(e?.message ?? String(e));
       }
-    });
+    }
 
-    document.getElementById('dataBtn').addEventListener('click', async () => {
-      clear();
+    async function decodeData() {
+      clearUI();
       try {
-        const info = await Cryptit.decodeData(inp.value.trim());
-        /* For nicer display convert Uint8Arrays to Base64 strings */
-        if (!info.isChunked) {
-          const b64 = (u) => btoa(String.fromCharCode(...u));
-          info.params.iv  = b64(info.params.iv);
-          info.params.tag = b64(info.params.tag);
+        const info = await Cryptit.decodeData(els.inp.value.trim());
+
+        // For nicer display, convert Uint8Arrays to Base64 when not chunked
+        if (!info.isChunked && info?.params) {
+          const toB64 = (u8) => btoa(String.fromCharCode(...u8));
+          if (info.params.iv)  info.params.iv  = toB64(info.params.iv);
+          if (info.params.tag) info.params.tag = toB64(info.params.tag);
         }
+
         pretty(info);
       } catch (e) {
         showErr(e?.message ?? String(e));
       }
-    });
+    }
+
+    // Events
+    els.headerBtn.addEventListener('click', decodeHeader);
+    els.dataBtn.addEventListener('click', decodeData);
   </script>
 </body>
 </html>

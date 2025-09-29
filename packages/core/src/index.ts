@@ -7,8 +7,8 @@ import { Difficulty, SaltStrength } from './config/defaults.js';
 import { encodeHeader }             from './header/encoder.js';
 import { decodeHeader }             from './header/decoder.js';
 import {
-  EncryptionAlgorithm,
   KeyDerivation,
+  PaddingAwareEncryptionAlgorithm,
   SchemeDescriptor,
   Secret
 } from './types/index.js';
@@ -18,6 +18,8 @@ import { StreamProcessor }          from './stream/StreamProcessor.js';
 import { EncryptTransform }         from './stream/EncryptTransform.js';
 import { DecryptTransform }         from './stream/DecryptTransform.js';
 import { ConvertibleInput, ConvertibleOutput } from './util/Convertible.js';
+
+import { Magic48VerCrc8Padding } from './algorithms/padding/magic48ver-crc8.js';
 
 import {
   createLogger,
@@ -65,6 +67,8 @@ export interface CryptitOptions {
   difficulty?   : Difficulty;
   /** Chunk size for streaming operations; defaults to descriptor's default */
   chunkSize?    : number;
+  /** Enable legacy file and text decryption version < 1.0.0 */
+  acceptUnauthenticatedHeader?    : boolean;
   /** Verbosity level 0-4 for logging (0 = errors only) */
   verbose?      : Verbosity;
   /** Optional custom logger callback (receives formatted messages) */
@@ -81,10 +85,12 @@ export type DecodeDataResult =
 export class Cryptit {
   // — runtime-mutable --------------------------------------------------------
   private v          : SchemeDescriptor;
-  private cipher     : EncryptionAlgorithm;
+  private cipher     : PaddingAwareEncryptionAlgorithm;
   private kdf        : KeyDerivation;
   private chunkSize  : number;
   private stream     : StreamProcessor;
+
+  private acceptUnauthenticatedHeader: boolean;
 
   private difficulty   : Difficulty;
   private saltStrength : SaltStrength;
@@ -111,6 +117,7 @@ export class Cryptit {
 
     this.difficulty     = opt.difficulty   ?? 'middle';
     this.saltStrength   = opt.saltStrength ?? 'high';
+    this.acceptUnauthenticatedHeader = opt.acceptUnauthenticatedHeader ?? false;
 
     this.log = createLogger(opt.verbose ?? 0, opt.logger);
   }
@@ -365,6 +372,10 @@ export class Cryptit {
 
       const header = encodeHeader(this.v.id, this.difficulty, this.saltStrength, salt, this.cipher);
 
+      this.cipher.setPaddingScheme(new Magic48VerCrc8Padding());
+      this.cipher.setPaddingAlign(8);
+      this.cipher.setPaddingAADMode('require');
+
       this.log.log(2, 'Encrypting text data');
       const cipher = await this.cipher.encryptChunk(plainBytes);
       this.cipher.zeroKey();
@@ -432,6 +443,11 @@ export class Cryptit {
         zeroizeString(secret);
         pass = null;
       }
+
+      engine.cipher.setPaddingScheme(new Magic48VerCrc8Padding());
+      engine.cipher.setPaddingAlign(8);
+      engine.cipher.setPaddingAADMode('require');
+      engine.cipher.setLegacyAADFallback({ enabled: true, policy: 'auto', tryEmptyAAD: this.acceptUnauthenticatedHeader ? true : false });
 
       this.log.log(2, 'Decrypting text data');
       decodeHeader(container, engine.cipher); // bind AAD on actual cipher
@@ -505,6 +521,8 @@ export class Cryptit {
 
       const header = encodeHeader(this.v.id, this.difficulty, this.saltStrength, salt, this.stream.getEngine());
 
+      this.stream.getEngine().setPaddingAADMode('forbid');
+
       const cipher = await this.stream.collect(
         file.stream() as ReadableStream<Uint8Array>,
         new EncryptTransform(this.cipher, this.chunkSize).toTransformStream(),
@@ -559,6 +577,8 @@ export class Cryptit {
       const streamProc = new StreamProcessor(engine.cipher, engine.chunkSize);
       // again for correc tdata
       decodeHeader(header, streamProc.getEngine());
+      engine.cipher.setPaddingAADMode('forbid');
+      engine.cipher.setLegacyAADFallback({ enabled: true, policy: 'auto', tryEmptyAAD: this.acceptUnauthenticatedHeader ? true : false });
       const plain = await streamProc.collect(
         file.slice(parsed.headerLen).stream() as ReadableStream<Uint8Array>,
         new DecryptTransform(engine.cipher, engine.chunkSize).toTransformStream(),
@@ -596,6 +616,7 @@ export class Cryptit {
     pass = null;
 
     const header = encodeHeader(this.v.id, this.difficulty, this.saltStrength, salt, this.stream.getEngine());
+    this.stream.getEngine().setPaddingAADMode('forbid');
     const tf     = this.stream.encryptionStream();
 
     return { header, writable: tf.writable, readable: tf.readable };
@@ -692,6 +713,9 @@ export class Cryptit {
 
           decodeHeader(headerBytes, engine.cipher); // Assign authenticated data to engine.cipher
 
+          engine.cipher.setPaddingAADMode('forbid');
+          engine.cipher.setLegacyAADFallback({ enabled: true, policy: 'auto', tryEmptyAAD: this.acceptUnauthenticatedHeader ? true : false });
+
           downstream = new DecryptTransform(engine.cipher, engine.chunkSize).toTransformStream();
           void pipeOut(downstream.readable, ctl).catch(err => ctl.error(err));
 
@@ -720,6 +744,54 @@ export class Cryptit {
         writer.releaseLock();
       },
     });
+  }
+
+  /**
+   * Generate a syntactically valid Cryptit container consisting of:
+   *   <header><random-bytes>
+   * The header is created from the current scheme, difficulty and salt strength,
+   * so it can be decoded by `decodeHeader()` and `decodeData()`, but the payload
+   * is just random noise (not decryptable).
+   *
+   * @param payloadLength - Number of random bytes to append after the header (>= 0).
+   * @returns Uint8Array containing header + random payload.
+   * @throws RangeError if payloadLength is negative or not an integer.
+   */
+  public generateFakeData(payloadLength: number = 0, usePadding: boolean = false): Uint8Array {
+    if (!Number.isInteger(payloadLength) || payloadLength < 0) {
+      throw new RangeError('payloadLength must be a non-negative integer.');
+    }
+
+    // Create a fresh salt using the configured salt strength
+    const salt = this.genSalt();
+
+    // Build a real header that matches current settings.
+    // Using the text-style header (cipher) keeps the container simple and valid.
+    const header = encodeHeader(
+      this.v.id,
+      this.difficulty,
+      this.saltStrength,
+      salt,
+      this.cipher
+    );
+
+    // Determine tail length
+    let tailLen = payloadLength;
+    if (usePadding) {
+      const MIN = 16;      // minimum bytes
+      const BLOCK = 8;     // must be a multiple of 8
+      const atLeastMin = Math.max(MIN, tailLen);
+      tailLen = Math.ceil(atLeastMin / BLOCK) * BLOCK; // round up to next multiple of 8
+    }
+
+    // Append N random bytes (noise) as the payload.
+    const tail =
+      tailLen > 0
+        ? this.provider.getRandomValues(new Uint8Array(tailLen))
+        : new Uint8Array(0);
+
+    // <header><random>
+    return concat(header, tail);
   }
 
   // ════════════════════════════════════════════════════════════════════════

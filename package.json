@@ -1,6 +1,6 @@
 {
     "name": "@mqxym/cryptit",
-    "version": "2.1.7",
+    "version": "2.2.0",
     "repository": "https://github.com/mqxym/cryptit",
     "description": "Modern, cross-platform AES-GCM 256 / XChaCha20Poly1305 + Argon2-id encryption for files and text.",
     "type": "module",

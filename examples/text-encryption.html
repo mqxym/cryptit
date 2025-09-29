@@ -80,7 +80,7 @@
             </select>
           </div>
           <div class="col-md-4">
-            <label for="saltStrength" class="form-label">Salt Strength</label> 
+            <label for="saltStrength" class="form-label">Salt Strength</label>
             <select id="saltStrength" class="form-select">
               <option value="low">low</option>
               <option value="high" selected>high</option>
@@ -122,73 +122,103 @@
                           
   </script>
 
-  <!-- your inline demo logic -->
+    <!-- Inline demo logic -->
   <script type="module">
     const { createCryptit } = window;
 
-    const secretEl       = document.getElementById('secret');
-    const schemeEl      = document.getElementById('scheme');
-    const difficultyEl   = document.getElementById('difficulty');
-    const saltStrengthEl = document.getElementById('saltStrength');
-    const verboseEl      = document.getElementById('verbose');
-    const inputEl        = document.getElementById('inputText');
-    const outputEl       = document.getElementById('outputText');
-    const errorEl        = document.getElementById('errorMsg');
+    // Shortcuts
+    const $ = (id) => document.getElementById(id);
+    const els = {
+      secret: $('secret'),
+      scheme: $('scheme'),
+      difficulty: $('difficulty'),
+      saltStrength: $('saltStrength'),
+      verbose: $('verbose'),
+      input: $('inputText'),
+      output: $('outputText'),
+      error: $('errorMsg'),
+      encryptBtn: $('encryptBtn'),
+      decryptBtn: $('decryptBtn'),
+    };
 
+    // Error UI
     function showError(msg) {
-      errorEl.textContent = msg;
-      errorEl.classList.remove('d-none');
+      els.error.textContent = msg || 'Something went wrong.';
+      els.error.classList.remove('d-none');
     }
     function clearError() {
-      errorEl.classList.add('d-none');
-      errorEl.textContent = '';
+      els.error.textContent = '';
+      els.error.classList.add('d-none');
     }
-    function getCryptitInstance() {
-      clearError();
+
+    // Cryptit factory
+    function cryptit() {
       return createCryptit({
-        scheme      : Number(schemeEl.value),
-        difficulty   : difficultyEl.value,
-        saltStrength : saltStrengthEl.value,
-        verbose      : Number(verboseEl.value),
+        scheme: Number(els.scheme.value),
+        difficulty: els.difficulty.value,
+        saltStrength: els.saltStrength.value,
+        verbose: Number(els.verbose.value),
       });
     }
 
-    document.getElementById('encryptBtn').addEventListener('click', async () => {
-      clearError();
-      await encrypt();
-    });
+    // Helpers
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-    async function encrypt () {
-        
-        const pass  = secretEl.value;
-        if (!pass) { showError('Passphrase is required'); return; }
-
-      try {
-        const crypt = getCryptitInstance();
-        const output = await crypt.encryptText(inputEl.value, pass);
-        outputEl.value = output.base64;
-        output.clear();
-      } catch (e) {
-        const name = e.constructor.name;
-        showError(e.message ?? String(e));
+    async function setBusy(btn, busy) {
+      const other = btn === els.encryptBtn ? els.decryptBtn : els.encryptBtn;
+      if (busy) {
+        if (!btn.dataset.original) btn.dataset.original = btn.textContent.trim();
+        btn.textContent = '...';
+        btn.disabled = true;
+        other.disabled = true;
+        await sleep(150); // delay before locking
+      } else {
+        btn.textContent = btn.dataset.original || btn.textContent;
+        btn.disabled = false;
+        other.disabled = false;
       }
     }
 
-    document.getElementById('decryptBtn').addEventListener('click', async () => {
+    // Actions
+    async function encrypt() {
       clearError();
-      const pass  = secretEl.value;
+      const pass = els.secret.value;
       if (!pass) { showError('Passphrase is required'); return; }
 
+      await setBusy(els.encryptBtn, true);
       try {
-        const crypt = getCryptitInstance();
-        const output = await crypt.decryptText(inputEl.value.trim(), pass);
-        outputEl.value = output.text;
-        output.clear();
+        const c = cryptit();
+        const result = await c.encryptText(els.input.value, pass);
+        els.output.value = result.base64;
+        result.clear?.();
       } catch (e) {
-        const name = e.constructor.name;
-        showError(e.message ?? String(e));
+        showError(e?.message ?? String(e));
+      } finally {
+        await setBusy(els.encryptBtn, false);
       }
-    });
+    }
+
+    async function decrypt() {
+      clearError();
+      const pass = els.secret.value;
+      if (!pass) { showError('Passphrase is required'); return; }
+
+      await setBusy(els.decryptBtn, true);
+      try {
+        const c = cryptit();
+        const result = await c.decryptText(els.input.value.trim(), pass);
+        els.output.value = result.text;
+        result.clear?.();
+      } catch (e) {
+        showError(e?.message ?? String(e));
+      } finally {
+        await setBusy(els.decryptBtn, false);
+      }
+    }
+
+  // Events
+  els.encryptBtn.addEventListener('click', encrypt);
+  els.decryptBtn.addEventListener('click', decrypt);
   </script>
 </body>
 </html>

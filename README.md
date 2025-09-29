@@ -186,6 +186,9 @@ echo "…b64…" | cryptit decrypt-text -p pw
 # inspect header, chunk and text details of Cryptit-encrypted payloads (no decryption)
 cryptit decode movie.enc
 cat movie.enc | cryptit decode
+
+# output fake data (valid header) in base64 with random 32-byte tail
+cryptit fake-data --base64 32
 ```
 
 ## Docker CLI

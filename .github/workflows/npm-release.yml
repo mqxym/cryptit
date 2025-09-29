@@ -63,6 +63,11 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
+      - name: Read package version
+        id: pkg_ver
+        shell: bash
+        run: echo "version=$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
+
       - name: Install dependencies
         run: bun ci
         shell: bash
@@ -92,11 +97,14 @@ jobs:
         shell: bash
         env:
           BIN: cryptit-cli-${{ matrix.target }}${{ matrix.ext }}
+          VERSION: ${{ steps.pkg_ver.outputs.version }}
         run: |
           set -euo pipefail
           pushd "${{ env.OUTDIR }}"
           chmod +x "$BIN" || true
-          tar -czf "${BIN}.tar.gz" "$BIN"
+          ARCHIVE="cryptit-cli-${{ matrix.target }}-${VERSION}${{ matrix.ext }}.tar.gz"
+          tar -czf "$ARCHIVE" "$BIN"
+          echo "Created $ARCHIVE"
           popd
 
       - name: Archive binary (zip on Windows)
@@ -105,21 +113,23 @@ jobs:
         env:
           OUTDIR: ${{ env.OUTDIR }}
           BIN: cryptit-cli-${{ matrix.target }}${{ matrix.ext }}
+          VERSION: ${{ steps.pkg_ver.outputs.version }}
         run: |
           $ErrorActionPreference = "Stop"
           $path = Join-Path $env:OUTDIR $env:BIN
-          # Ensure file exists, then zip it
           if (!(Test-Path $path)) { throw "Binary not found: $path" }
-          Compress-Archive -Path $path -DestinationPath (Join-Path $env:OUTDIR ($env:BIN + ".zip")) -Force
+          $archiveName = "cryptit-cli-${{ matrix.target }}-$env:VERSION${{ matrix.ext }}.zip"
+          Compress-Archive -Path $path -DestinationPath (Join-Path $env:OUTDIR $archiveName) -Force
+          Write-Host "Created $archiveName"
 
       - name: Upload artifact (${{ matrix.target }})
         uses: actions/upload-artifact@v4
         with:
-          # Upload the archive we just made (zip on Windows, tar.gz elsewhere)
-          name: cryptit-cli-${{ matrix.target }}-archive
+          name: cryptit-cli-${{ matrix.target }}-v${{ steps.pkg_ver.outputs.version }}
           path: |
-            ${{ env.OUTDIR }}/cryptit-cli-${{ matrix.target }}${{ matrix.ext }}.tar.gz
-            ${{ env.OUTDIR }}/cryptit-cli-${{ matrix.target }}${{ matrix.ext }}.zip
+            ${{ env.OUTDIR }}/cryptit-cli-${{ matrix.target }}-${{ steps.pkg_ver.outputs.version }}${{ matrix.ext }}.tar.gz
+            ${{ env.OUTDIR }}/cryptit-cli-${{ matrix.target }}-${{ steps.pkg_ver.outputs.version }}${{ matrix.ext }}.zip
+          if-no-files-found: ignore
 
   release:
     name: Upload to GitHub Release

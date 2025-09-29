@@ -103,7 +103,12 @@ await Bun.spawn({
 await doBuild({
   entrypoints: ["packages/browser-runtime/src/index.ts"],
   outdir: outdirBrowser,
-  minify: true,
+  minify: {
+    whitespace: true,
+    identifiers: false,
+    syntax: true,
+    keepNames: true,
+  },
   format: "esm",
   external: ["commander", "buffer", "process", "@node-rs/argon2"],
   target: "browser",

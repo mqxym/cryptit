@@ -12,7 +12,7 @@ import { dirname , resolve, sep, isAbsolute} from 'node:path';
 import { toWebReadable, toWebWritable } from './streamAdapter.js';
 
 
-const PKG_VERSION = '2.1.6'; // sync with root package.json
+const PKG_VERSION = '2.2.0'; // sync with root package.json
 
 const DEFAULT_ROOT = process.cwd();
 
@@ -428,6 +428,7 @@ program
   .description('Decrypt file; use - for STDIN, --out - for STDOUT')
   .option('-p, --pass <passphrase>', 'passphrase (prompt if omitted)')
   .option('-o, --out <file>', 'output file (default STDOUT)', '-')
+  .option('--legacy', 'Enable text decryption of version < 1.0.0', false)
   .action(async (src, cmd) => {
     
     if (src !== '-' && !existsSync(src)) {
@@ -442,6 +443,7 @@ program
       chunkSize: opts.chunkSize,
       verbose: opts.verbose,
       scheme: opts.scheme,
+      acceptUnauthenticatedHeader: cmd.legacy,
     });
 
     try {
@@ -493,13 +495,15 @@ program
   .command('decrypt-text [b64]')
   .description('Decrypt Base64 ciphertext; omit arg to read from STDIN')
   .option('-p, --pass <passphrase>', 'passphrase (prompt if omitted)')
-  .action(async (b64) => {
+  .option('--legacy', 'Enable text decryption of version < 1.0.0', false)
+  .action(async (b64, options: {legacy?: boolean}) => {
     const opts  = program.opts();
     const crypt = createCryptit({
       difficulty: opts.difficulty,
       saltStrength: opts.saltStrength,
       verbose: opts.verbose,
       scheme: opts.scheme,
+      acceptUnauthenticatedHeader: options.legacy,
     });
     const pass = opts.pass ?? await promptPass();
     const data = b64 ?? (await readAllFromStdin()).trim();
@@ -509,6 +513,59 @@ program
     }
     const plain = await crypt.decryptText(data, pass);
     stdout.write(plain.text + '\n');
+  });
+
+program
+  .command('fake-data <length>')
+  .description('Emit a valid Cryptit header followed by <length> random bytes')
+  .option('-o, --out <file>', 'output file (default STDOUT)', '-')
+  .option('--base64', 'encode output as Base64 text (adds trailing newline)')
+  .option('--use-padding', "rounds <length> to the nearest 8 bytes to allow for realistic text-payloads.", false)
+  .action(async (lengthArg: string, cmd: { out: string; base64?: boolean; usePadding: boolean }) => {
+    const len = Number(lengthArg);
+    if (!Number.isInteger(len) || len < 0) {
+      stderr.write('Error: <length> must be a non-negative integer\n');
+      processExit(1);
+    }
+
+    const opts = program.opts();
+    const crypt = createCryptit({
+      difficulty: opts.difficulty,
+      saltStrength: opts.saltStrength,
+      chunkSize: opts.chunkSize,
+      verbose: opts.verbose,
+      scheme: opts.scheme,
+    });
+
+    // Prepare destination
+    try {
+      assertWritable(cmd.out);
+    } catch (err: any) {
+      stderr.write(`Error: ${err.message}\n`);
+      processExit(1);
+    }
+
+    // Generate header + random payload
+    const data = crypt.generateFakeData(len, cmd.usePadding);
+    const buf  = Buffer.from(data);
+
+    // Write output
+    if (cmd.base64) {
+      const b64 = buf.toString('base64') + '\n';
+      if (cmd.out === '-') {
+        stdout.write(b64);
+      } else {
+        await fsp.writeFile(cmd.out, b64, { encoding: 'utf8' });
+      }
+      return;
+    }
+
+    if (cmd.out === '-') {
+      // Raw binary to STDOUT
+      stdout.write(buf);
+    } else {
+      await fsp.writeFile(cmd.out, buf);
+    }
   });
 
 if (process.argv.length <= 2) {

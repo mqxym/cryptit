@@ -1,4 +1,6 @@
 import type { CryptoProvider } from '../providers/CryptoProvider.js';
+import type { PaddingScheme } from '../algorithms/padding/magic48ver-crc8.js';
+import type { PaddingAADMode } from '../algorithms/encryption/base/BaseAEADWithPadAAD.js';
 
 /* ------------------------- Encryption engine ------------------------- */
 export interface EncryptionAlgorithm {
@@ -9,6 +11,17 @@ export interface EncryptionAlgorithm {
   setAAD(aadData: Uint8Array): void; //set additional data (header)
   readonly IV_LENGTH: number;
   readonly TAG_LENGTH: number;
+}
+
+export interface PaddingAwareEncryptionAlgorithm extends EncryptionAlgorithm {
+  setPaddingScheme(s: PaddingScheme | null): void;
+  setPaddingAADMode(mode: PaddingAADMode): void;
+  setPaddingAlign(n: number): void;
+  setLegacyAADFallback(opts: {
+    enabled?: boolean;
+    policy?: PaddingAADMode;
+    tryEmptyAAD?: boolean
+  }): void
 }
 
 /* ------------------------- Key derivation ---------------------------- */
@@ -25,7 +38,7 @@ export interface KeyDerivation<D extends string = string> {
 export interface CipherConstructor {
   /* static */ readonly IV_LENGTH: number;
   /* static */ readonly TAG_LENGTH: number
-  new (p: CryptoProvider): EncryptionAlgorithm;
+  new (p: CryptoProvider): PaddingAwareEncryptionAlgorithm;
 }
 
 /* ---------------------------------------------------------------------
