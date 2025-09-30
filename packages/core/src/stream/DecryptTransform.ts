@@ -40,9 +40,16 @@ export class DecryptTransform {
     while (true) {
       if (combined.length - offset < FRAME_HEADER_BYTES) break;
       const cipherLen = decodeFrameLen(combined, offset);
-      if (cipherLen > this.chunkSize * 2) {
-        throw new DecryptionError(`Frame length ${cipherLen} exceeds …`);
+      const HARD_LIMIT = 64 * 1024 * 1024; // 64 MiB
+      const minFrame   = this.engine.IV_LENGTH + this.engine.TAG_LENGTH;
+
+      if (!Number.isInteger(cipherLen) || cipherLen < minFrame || cipherLen > HARD_LIMIT) {
+        ctl.error(new DecryptionError(
+          `Invalid frame length ${cipherLen} (min=${minFrame}, max=${HARD_LIMIT})`
+        ));
+        return; // IMPORTANT: stop now that the stream is errored
       }
+      
       if (combined.length - offset - FRAME_HEADER_BYTES < cipherLen) break;
       offset += FRAME_HEADER_BYTES;
       const cipher = combined.slice(offset, offset + cipherLen);
@@ -52,11 +59,12 @@ export class DecryptTransform {
         const plain = await this.engine.decryptChunk(cipher);
         ctl.enqueue(plain);
       } catch (err) {
-        throw err instanceof DecryptionError
-          ? err
-         : new DecryptionError(
-              'Decryption failed: Wrong passphrase or corrupted ciphertext',
-            );
+        ctl.error(
+          err instanceof DecryptionError
+            ? err
+            : new DecryptionError('Decryption failed: Wrong passphrase or corrupted ciphertext')
+        );
+        return;
       }
     }
 
@@ -65,7 +73,12 @@ export class DecryptTransform {
 
   private async flush(ctl: TransformStreamDefaultController<Uint8Array>) {
     await this.transform(new Uint8Array(0), ctl);
+    const leftover = this.buffer.byteLength;
     this.buffer = new Uint8Array(0);
     this.engine.zeroKey();
+    if (leftover !== 0) {
+      ctl.error(new DecryptionError('Truncated ciphertext: incomplete final frame'));
+      return;
+    }
   }
 }

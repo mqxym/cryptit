@@ -1,12 +1,12 @@
 // packages/core/src/stream/StreamProcessor.ts
 import { EncryptTransform } from './EncryptTransform.js';
 import { DecryptTransform } from './DecryptTransform.js';
-import type { EncryptionAlgorithm } from '../types/index.js';
+import type { PaddingAwareEncryptionAlgorithm } from '../types/index.js';
 import { collectStream } from '../util/stream.js';
 
 export class StreamProcessor {
   constructor(
-    private readonly engine: EncryptionAlgorithm,
+    private readonly engine: PaddingAwareEncryptionAlgorithm,
     private readonly chunkSize = 512 * 1024,
   ) {}
 
@@ -53,7 +53,7 @@ export class StreamProcessor {
    return collectStream(readable.pipeThrough(transform), prefix ?? undefined);
   }
 
-  public getEngine() : EncryptionAlgorithm {
+  public getEngine() : PaddingAwareEncryptionAlgorithm {
     return this.engine;
   }
 }

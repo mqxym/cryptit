@@ -128,7 +128,7 @@ await createReadStream("movie.enc")
 ```ts
 import { createCryptit, Cryptit } from "@mqxym/cryptit";
 // Also available: ConvertibleInput / ConvertibleOutput
-// import { ConvertibleInput, ConvertibleOutput } from "@mqxym/cryptit/util/convertible";
+// import { ConvertibleInput, ConvertibleOutput } from "@mqxym/cryptit";
 
 const c = createCryptit({ verbose: 1 });
 
@@ -186,6 +186,9 @@ echo "…b64…" | cryptit decrypt-text -p pw
 # inspect header, chunk and text details of Cryptit-encrypted payloads (no decryption)
 cryptit decode movie.enc
 cat movie.enc | cryptit decode
+
+# output fake data (valid header) in base64 with random 32-byte tail
+cryptit fake-data --base64 32
 ```
 
 ## Docker CLI
@@ -218,6 +221,23 @@ Exit codes: **0** success · **1** any failure (invalid header, auth, I/O …)
 
 * Header: `0x01 | infoByte | salt`
 * Decryptors pick the engine by the header’s scheme ⇒ **one CLI handles all registered schemes**.
+
+### Additional Authenticated Data
+
+* Since version 1.0.0: Header data is authenticated.
+* Since version 2.2.0: `encryptText()` uses 8-bit padding before AEAD, which is also tagged in AAD.
+
+### Compatibility
+
+* To decrypt data from versions prior to 1.0.0, there is a temporary solution:
+
+  ```javascript
+  const cryptit = createCryptit({ acceptUnauthenticatedHeader: true });
+  ```
+
+  * This option will be removed in future releases because the header must always be authenticated.
+* The padding tag for encrypted text in AAD is not required, so encrypted text from versions prior to 2.2.0 can still be decrypted with versions greater than 2.2.0.
+  * This backward compatibility will also be removed in future releases.
 
 ---
 

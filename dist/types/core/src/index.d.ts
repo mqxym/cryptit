@@ -27,6 +27,8 @@ export interface CryptitOptions {
     difficulty?: Difficulty;
     /** Chunk size for streaming operations; defaults to descriptor's default */
     chunkSize?: number;
+    /** Enable legacy file and text decryption version < 1.0.0 */
+    acceptUnauthenticatedHeader?: boolean;
     /** Verbosity level 0-4 for logging (0 = errors only) */
     verbose?: Verbosity;
     /** Optional custom logger callback (receives formatted messages) */
@@ -59,6 +61,7 @@ export declare class Cryptit {
     private kdf;
     private chunkSize;
     private stream;
+    private acceptUnauthenticatedHeader;
     private difficulty;
     private saltStrength;
     private readonly engines;
@@ -182,6 +185,18 @@ export declare class Cryptit {
      * @returns TransformStream encrypting Uint8Array chunks to Uint8Array plaintext chunks
      */
     createDecryptionStream(pass: string | null): Promise<TransformStream<Uint8Array, Uint8Array>>;
+    /**
+     * Generate a syntactically valid Cryptit container consisting of:
+     *   <header><random-bytes>
+     * The header is created from the current scheme, difficulty and salt strength,
+     * so it can be decoded by `decodeHeader()` and `decodeData()`, but the payload
+     * is just random noise (not decryptable).
+     *
+     * @param payloadLength - Number of random bytes to append after the header (>= 0).
+     * @returns Uint8Array containing header + random payload.
+     * @throws RangeError if payloadLength is negative or not an integer.
+     */
+    generateFakeData(payloadLength?: number, usePadding?: boolean): Uint8Array;
     /**
      * Derive cryptographic key from passphrase and salt using configured KDF.
      * @param pass - Passphrase to derive key from

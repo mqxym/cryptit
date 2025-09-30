@@ -1,7 +1,7 @@
 import { SchemeRegistry } from '../config/SchemeRegistry.js';
 import type {
   SchemeDescriptor,
-  EncryptionAlgorithm,
+  PaddingAwareEncryptionAlgorithm,
   KeyDerivation,
   Secret,
 } from '../types/index.js';
@@ -11,7 +11,7 @@ import { zeroizeString } from '../util/bytes.js';
 
 export interface Engine {
   desc      : SchemeDescriptor;
-  cipher    : EncryptionAlgorithm;
+  cipher    : PaddingAwareEncryptionAlgorithm;
   kdf       : KeyDerivation;
   chunkSize : number;
   provider  : CryptoProvider;

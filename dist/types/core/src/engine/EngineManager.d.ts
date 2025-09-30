@@ -1,8 +1,8 @@
-import type { SchemeDescriptor, EncryptionAlgorithm, KeyDerivation, Secret } from '../types/index.js';
+import type { SchemeDescriptor, PaddingAwareEncryptionAlgorithm, KeyDerivation, Secret } from '../types/index.js';
 import type { CryptoProvider } from '../providers/CryptoProvider.js';
 export interface Engine {
     desc: SchemeDescriptor;
-    cipher: EncryptionAlgorithm;
+    cipher: PaddingAwareEncryptionAlgorithm;
     kdf: KeyDerivation;
     chunkSize: number;
     provider: CryptoProvider;

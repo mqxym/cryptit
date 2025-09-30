@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------
-   EncryptTransform – defensive limits
+   EncryptTransform - defensive limits
    ------------------------------------------------------------------ */
 import { EncryptTransform }   from '../../src/stream/EncryptTransform.js';
 import type { EncryptionAlgorithm } from '../../src/types/index.js';
