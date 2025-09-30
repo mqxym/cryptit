@@ -81,10 +81,10 @@ export class Magic48VerCrc8Padding implements PaddingScheme {
   private static readonly STRUCT_SIZE = 8; // MAGIC40(5) + VER(1) + LEN(1) + CRC8(1)
 
   /** 40-bit magic constant (product/protocol unique). */
-  private static readonly MAGIC40 = new Uint8Array([0xE3, 0x7A, 0xC1, 0x5D, 0xB4]); // example
+  private static readonly MAGIC40 = new Uint8Array([0xC4, 0xE7, 0x9B, 0xAD, 0xF2]); 
 
   /** Version byte (placed immediately after MAGIC40). */
-  private static readonly VERSION = 0x29; // example
+  private static readonly VERSION = 0x29;
 
   /** CRC-8-ATM polynomial. */
   private static readonly CRC8_POLY = 0x07;

@@ -23,4 +23,9 @@ describe('Cryptit.decodeHeader / isEncrypted helpers', () => {
     expect(meta.scheme).toBe(crypt.getScheme());
     expect(meta.saltLength).toBeGreaterThan(0);
   });
+
+  it('isEncrypted() returns false for Blob shorter than 2 bytes', async () => {
+    const tiny = new Blob([Uint8Array.of(0x01)]);
+    expect(await Cryptit.isEncrypted(tiny)).toBe(false);
+  });
 });

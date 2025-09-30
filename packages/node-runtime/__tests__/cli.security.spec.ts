@@ -33,4 +33,18 @@ describe('cryptit CLI - assertWritable blocks “../” traversal', () => {
     await expect(fs.access(evilPath)).rejects.toThrow();
     await fs.rm(dir, { recursive: true, force: true });
   });
+
+  it('refuses to write to a non-existent output directory with a friendly error', async () => {
+    const dir = await fs.mkdtemp(`${tmpdir()}/cryptit-`);
+    const src = join(dir, 'in.bin');
+    await fs.writeFile(src, randomBytes(32));
+
+    const outDir = join(dir, 'no-such-dir');             // does not exist
+    const res = await run(['encrypt', src, '--pass', 'pw', '--out', join(outDir, 'x.enc')]);
+
+    expect(res.exitCode).not.toBe(0);
+    expect(res.stderr).toMatch(/Output directory does not exist/);
+
+    await fs.rm(dir, { recursive: true, force: true });
+  });
 });

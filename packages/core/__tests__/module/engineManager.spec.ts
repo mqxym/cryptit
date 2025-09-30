@@ -30,4 +30,16 @@ describe('EngineManager', () => {
 
     expect(plainUnit).toEqual(srcCopy);
   });
+
+  it('deriveKey zeroizes the provided secret', async () => {
+    const engine = EngineManager.getEngine(nodeProvider, 0);
+    const salt   = nodeProvider.getRandomValues(new Uint8Array(16));
+    const secret = { value: 'super-secret' };
+
+    await EngineManager.deriveKey(engine, secret, salt, 'middle');
+
+    // All characters replaced with NULs (\0)
+    expect(secret.value).toHaveLength('super-secret'.length);
+    expect([...secret.value].every(ch => ch === '\0')).toBe(true);
+  });
 });

@@ -12,7 +12,7 @@ import { dirname , resolve, sep, isAbsolute} from 'node:path';
 import { toWebReadable, toWebWritable } from './streamAdapter.js';
 
 
-const PKG_VERSION = '2.2.0'; // sync with root package.json
+const PKG_VERSION = '2.2.1'; // sync with root package.json
 
 const DEFAULT_ROOT = process.cwd();
 
@@ -56,8 +56,17 @@ function assertWritable(out: string, root: string = DEFAULT_ROOT) {
                   ? resolve(out)
                   : resolve(absRoot, out);
 
-  const targetDir  = dirname(absOut);
+  const targetDir = dirname(absOut);
+
+  if (!existsSync(targetDir)) {
+    throw new FilesystemError(`Output directory does not exist: ${targetDir}`);
+  }
+
   const realTarget = realpathSync(targetDir);
+
+  if (!realTarget.startsWith(absRoot + sep)) {
+    throw new FilesystemError('Refusing to write outside of root directory.');
+  }
 
   if (!realTarget.startsWith(absRoot + sep)) {
     throw new FilesystemError('Refusing to write outside of root directory.');
@@ -253,11 +262,12 @@ program
 
     /** Stream STDIN to a temporary file and return its absolute path */
     async function stdinToTempFile(): Promise<string> {
-      // Default 1 GiB limit; allow override via env (bytes)
+      // Default 10 GiB limit; allow override via env (bytes)
       const envLimit = Number(process.env.CRYPTIT_STDIN_MAX_BYTES);
+      const TEN_GIB = 10 * 1024 * 1024 * 1024; // 10_737_418_240
       const MAX_BYTES = Number.isFinite(envLimit) && envLimit > 0
         ? Math.floor(envLimit)
-        : 10_073_741_824; // 10 GiB
+        : TEN_GIB; // 10 GiB
 
       const dir     = await fsp.mkdtemp(path.join(os.tmpdir(), 'cryptit-'));
       const tmpPath = path.join(dir, 'stdin.bin');
@@ -326,7 +336,7 @@ program
           stdout.write(JSON.stringify(meta, null, 2) + '\n');
           return;
         } catch {
-          /* fall through – maybe it’s Base-64 text */
+          /* fall through - maybe it’s Base-64 text */
         }
       } finally {
         await fileSrc.close();

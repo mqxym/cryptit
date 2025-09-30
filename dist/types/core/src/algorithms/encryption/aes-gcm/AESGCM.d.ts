@@ -1,6 +1,6 @@
 import { CryptoProvider } from '../../../providers/CryptoProvider.js';
 import { BaseAEADWithPadAAD } from '../base/BaseAEADWithPadAAD.js';
-import type { PaddingAwareEncryptionAlgorithm } from 'packages/core/src/types/index.js';
+import type { PaddingAwareEncryptionAlgorithm } from '../../../types/index.js';
 /**
  * AES-GCM encryption with padding policy binding via {@link BaseAEADWithPadAAD}.
  *

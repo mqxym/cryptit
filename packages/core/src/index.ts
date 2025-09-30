@@ -200,9 +200,15 @@ export class Cryptit {
 
     // Compute remaining payload length
     const totalLen  = src.length;
-    const remain    = totalLen - headerLen;
-    if (remain <= 0) {
-      throw new InvalidHeaderError('Payload is empty');
+    const remain = totalLen - headerLen;
+    if (remain < 0) {
+      throw new InvalidHeaderError('Payload underflow');
+    }
+    if (remain === 0) {
+      return {
+        isChunked: true,
+        chunks: { chunkSize: 0, count: 0, totalPayload: 0 },
+      } as const;
     }
 
     const first4   = await src.read(headerLen, 4);
@@ -635,7 +641,6 @@ export class Cryptit {
   ): Promise<TransformStream<Uint8Array, Uint8Array>> {
     if (pass === null) throw new EncryptionError("Password can't be null");
 
-    // Capture only what you need from `this`
     const provider = this.provider;
 
     const secret = { value: pass };
@@ -643,9 +648,8 @@ export class Cryptit {
     let downstream: TransformStream<Uint8Array, Uint8Array> | null = null;
 
     const MAX_HEADER_PREFIX = 64 * 1024;
-    const MIN_HEADER_BYTES  = 2 + 12;
+    const MIN_INFO_BYTES    = 2;
 
-    // Arrow => no `this` surprises
     const pipeOut = async (
       readable: ReadableStream<Uint8Array>,
       ctl: TransformStreamDefaultController<Uint8Array>,
@@ -661,19 +665,25 @@ export class Cryptit {
     return new TransformStream<Uint8Array, Uint8Array>({
       transform: async (chunk, ctl) => {
         if (!downstream) {
+          // --- New: only add up to MAX_HEADER_PREFIX bytes to the scan buffer.
+          let tail: Uint8Array = new Uint8Array(0);
           if (chunk && chunk.byteLength) {
-            if (buf.byteLength + chunk.byteLength > MAX_HEADER_PREFIX) {
-              zeroizeString(secret);
-              ctl.error(new InvalidHeaderError(
-                `Header not found within ${MAX_HEADER_PREFIX} bytes`,
-              ));
-              return;
+            const room = Math.max(0, MAX_HEADER_PREFIX - buf.byteLength);
+            const head = room ? chunk.subarray(0, room) : new Uint8Array(0);
+            tail       = chunk.subarray(head.byteLength);
+
+            if (head.byteLength) {
+              const nxt = new Uint8Array(buf.byteLength + head.byteLength);
+              nxt.set(buf);
+              nxt.set(head, buf.byteLength);
+              buf = nxt;
             }
-            buf = concat(buf, chunk);
           }
 
-          if (buf.byteLength < MIN_HEADER_BYTES) return;
+          // Need at least the first 2 bytes to read "info"
+          if (buf.byteLength < MIN_INFO_BYTES) return;
 
+          // Determine required header length
           const info         = buf[1];
           const scheme       = info >> 5;
           const saltStrength = ((info >> 2) & 1) ? 'high' : 'low';
@@ -691,8 +701,18 @@ export class Cryptit {
             return;
           }
 
-          if (buf.byteLength < hdrLen) return;
+          // Not enough yet to hold the full header? keep waiting unless we've hit the cap.
+          if (buf.byteLength < hdrLen) {
+            if (buf.byteLength >= MAX_HEADER_PREFIX) {
+              zeroizeString(secret);
+              ctl.error(new InvalidHeaderError(
+                `Header not found within ${MAX_HEADER_PREFIX} bytes`,
+              ));
+            }
+            return;
+          }
 
+          // Parse header
           const headerBytes = buf.subarray(0, hdrLen);
           let parsed: ReturnType<typeof decodeHeader>;
           try {
@@ -703,6 +723,7 @@ export class Cryptit {
             return;
           }
 
+          // Initialize engine and derive key
           const engine = EngineManager.getEngine(provider, parsed.scheme);
           try {
             await EngineManager.deriveKey(engine, secret, parsed.salt, parsed.difficulty);
@@ -711,24 +732,32 @@ export class Cryptit {
             pass = null;
           }
 
-          decodeHeader(headerBytes, engine.cipher); // Assign authenticated data to engine.cipher
-
+          // Bind AAD, configure cipher
+          decodeHeader(headerBytes, engine.cipher);
           engine.cipher.setPaddingAADMode('forbid');
-          engine.cipher.setLegacyAADFallback({ enabled: true, policy: 'auto', tryEmptyAAD: this.acceptUnauthenticatedHeader ? true : false });
+          engine.cipher.setLegacyAADFallback({
+            enabled: true,
+            policy: 'auto',
+            tryEmptyAAD: this.acceptUnauthenticatedHeader ? true : false,
+          });
 
+          // Build downstream using WRITER's chunkSize from the header/engine
           downstream = new DecryptTransform(engine.cipher, engine.chunkSize).toTransformStream();
           void pipeOut(downstream.readable, ctl).catch(err => ctl.error(err));
 
+          // Immediately forward remainder of buffered data + any tail from this chunk
           const remainder = buf.subarray(hdrLen);
           buf = new Uint8Array(0);
-          if (remainder.byteLength) {
+          if (remainder.byteLength || tail.byteLength) {
             const w = downstream.writable.getWriter();
-            await w.write(remainder);
+            if (remainder.byteLength) await w.write(remainder);
+            if (tail.byteLength)      await w.write(tail);
             w.releaseLock();
           }
           return;
         }
 
+        // Already initialized: pass through
         const writer = downstream.writable.getWriter();
         await writer.write(chunk);
         writer.releaseLock();
@@ -840,27 +869,24 @@ export class Cryptit {
    * @throws HeaderDecodeError or InvalidHeaderError on invalid input
    */
 
-  private static async peekHeader(input: string | Uint8Array | Blob) {
+  private static async peekHeader(input: string | Uint8Array | Blob): Promise<Uint8Array> {
     const buf = await this.readAsUint8(input);
+    if (buf.length < 2) throw new InvalidHeaderError('Input too short');
 
-    // Handle raw Uint8Array input
-    if (buf instanceof Uint8Array) {
-      if (buf.length < 2) throw new InvalidHeaderError('Input too short');
-      const { headerLen } = decodeHeader(
-        buf.length >= 16 ? buf : Uint8Array.from(buf),
-      );
-      if (buf.length < headerLen) throw new InvalidHeaderError('Incomplete header');
-      return buf.slice(0, headerLen);
-    }
-    throw new HeaderDecodeError('Unsupported input type');
+    const { headerLen } = decodeHeader(buf.length >= 32 ? buf : buf.slice());
+
+    if (buf.length < headerLen) throw new InvalidHeaderError('Incomplete header');
+    return buf.slice(0, headerLen);
   }
 
   private static async readAsUint8(input: string | Uint8Array | Blob): Promise<Uint8Array> {
     if (typeof input === 'string') return base64Decode(input);
+    if (input instanceof Uint8Array) return input;
     if (input instanceof Blob) {
-      const slice = input.slice(0, 64);
+      const need = Math.max(32, Math.min(256, input.size));
+      const slice = input.slice(0, need);
       return new Uint8Array(await slice.arrayBuffer());
     }
-    return input;
+    throw new HeaderDecodeError('Unsupported input type');
   }
 }

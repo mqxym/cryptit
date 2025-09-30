@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------
-   ByteSource – out‑of‑bounds & zero‑length slices
+   ByteSource - out‑of‑bounds & zero‑length slices
    ------------------------------------------------------------------ */
 import { ByteSource }   from '../../src/util/ByteSource.js';
 import { base64Encode } from '../../src/util/bytes.js';

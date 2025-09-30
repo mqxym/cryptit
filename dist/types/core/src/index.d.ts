@@ -196,7 +196,7 @@ export declare class Cryptit {
      * @returns Uint8Array containing header + random payload.
      * @throws RangeError if payloadLength is negative or not an integer.
      */
-    generateFakeData(payloadLength?: number): Uint8Array;
+    generateFakeData(payloadLength?: number, usePadding?: boolean): Uint8Array;
     /**
      * Derive cryptographic key from passphrase and salt using configured KDF.
      * @param pass - Passphrase to derive key from
