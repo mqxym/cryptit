@@ -8,3 +8,4 @@ scan*.md
 *.enc
 *.mp4
 local-compiled/
+tests/.cryptit-perf-work/*

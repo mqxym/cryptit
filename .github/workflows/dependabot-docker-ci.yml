@@ -1,0 +1,55 @@
+name: Dependabot Docker CI
+
+on:
+  pull_request:
+    branches:
+      - "**"
+    paths:
+      - "Dockerfile"
+      - "packages/**"
+      - "package.json"
+      - "package-lock.json"
+      - "bun.lock*"
+  push:
+    branches:
+      - "dependabot/**"
+    paths:
+      - "Dockerfile"
+      - "packages/**"
+      - "package.json"
+      - "package-lock.json"
+      - "bun.lock*"
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build & test cryptit image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (with cache)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          tags: cryptit:test
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run e2e tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash ./tests/docker_e2e.sh
