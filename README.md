@@ -263,6 +263,49 @@ bun install && bun run build && bun test
 
 ---
 
+## CLI Benchmarks (Bun Engine, MacOS, M3 Pro Chip)
+
+> **TL;DR:** Scheme 0 is consistently faster. Peak streaming throughput hits **~795 MiB/s** (enc stdin→stdout, 256 MiB, low). Scheme 1 peaks **~152 MiB/s**. Decode latency is ~**40–200 ms** depending on source/difficulty.
+
+<details>
+<summary><strong>Scheme 0</strong> — AES-GCM (Crypto API)</summary>
+
+**Higher is faster (MiB/s). Decode columns are latency (ms).**
+
+|   Size  | Difficulty | enc f→f | dec f→out | enc in→out | dec in→out | decode file (ms) | decode stdin (ms) |
+| :-----: | :--------: | ------: | --------: | ---------: | ---------: | ---------------: | ----------------: |
+|  64 MiB |     low    |     202 |       255 |        277 |        282 |               41 |                79 |
+|  64 MiB |   middle   |     104 |       104 |        112 |        111 |               39 |                77 |
+|  64 MiB |    high    |      58 |        58 |         61 |         60 |               40 |                79 |
+| 256 MiB |     low    |     587 |       568 |    **795** |        755 |               44 |               144 |
+| 256 MiB |   middle   |     321 |       311 |        374 |        367 |               46 |               198 |
+| 256 MiB |    high    |     198 |       195 |        219 |        217 |               44 |               138 |
+
+</details>
+
+<details>
+<summary><strong>Scheme 1</strong> — XChaCha20-Poly1305 (noble/ciphers)</summary>
+
+**Higher is faster (MiB/s). Decode columns are latency (ms).**
+
+|   Size  | Difficulty | enc f→f | dec f→out | enc in→out | dec in→out | decode file (ms) | decode stdin (ms) |
+| :-----: | :--------: | ------: | --------: | ---------: | ---------: | ---------------: | ----------------: |
+|  64 MiB |     low    |     103 |       103 |        106 |        107 |               40 |                68 |
+|  64 MiB |   middle   |      72 |        71 |         76 |         75 |               40 |                69 |
+|  64 MiB |    high    |      49 |        49 |         52 |         51 |               40 |                74 |
+| 256 MiB |     low    |     137 |       140 |    **152** |        149 |               45 |               133 |
+| 256 MiB |   middle   |     122 |       122 |        131 |        130 |               44 |               145 |
+| 256 MiB |    high    |     101 |       103 |        109 |        108 |               44 |               137 |
+
+</details>
+
+**Legend:**
+`enc f→f` = encrypt file→file • `dec f→out` = decrypt file→stdout • `enc in→out` = encrypt stdin→stdout • `dec in→out` = decrypt stdin→stdout.
+
+<sub>Run config: Bun CLI, scheme 0/1, difficulties: low/middle/high, sizes: 64 MiB & 256 MiB, repeats=1 (2025-10-05).</sub>
+
+---
+
 ## License
 
 MIT
