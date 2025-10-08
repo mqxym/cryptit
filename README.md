@@ -265,44 +265,80 @@ bun install && bun run build && bun test
 
 ## CLI Benchmarks (Bun Engine, MacOS, M3 Pro Chip)
 
-> **TL;DR:** Scheme 0 is consistently faster. Peak streaming throughput hits **~795 MiB/s** (enc stdin→stdout, 256 MiB, low). Scheme 1 peaks **~152 MiB/s**. Decode latency is ~**40–200 ms** depending on source/difficulty.
+> **TL;DR**
+> • **Scheme 0** (AES‑GCM/SubtleCrypto + XChaCha20‑Poly1305) is much faster for streaming: **peak ~1,810 MiB/s** (stdin→stdout, 256 MiB, *middle*).
+> • **Scheme 1** (XChaCha20‑Poly1305) peaks **~170 MiB/s**.
+> • KDF cost is now measured separately and **not** included in “stream‑only” throughput below.
+
+---
+
+#### KDF Baseline (avg of 3, encrypt‑text 16 B payload)
+
+| Difficulty | KDF avg (Scheme 0) | KDF avg (Scheme 1) |
+| :--------: | -----------------: | -----------------: |
+|     low    |         174.29 ms  |         167.05 ms  |
+|   middle   |         540.41 ms  |         442.74 ms  |
+|    high    |        1013.10 ms  |         825.44 ms  |
 
 <details>
-<summary><strong>Scheme 0</strong> — AES-GCM (Crypto API)</summary>
+<summary><strong>Stream‑only Throughput (KDF‑subtracted) — Scheme 0</strong></summary>
 
-**Higher is faster (MiB/s). Decode columns are latency (ms).**
+**Higher is better (MiB/s).**
 
-|   Size  | Difficulty | enc f→f | dec f→out | enc in→out | dec in→out | decode file (ms) | decode stdin (ms) |
-| :-----: | :--------: | ------: | --------: | ---------: | ---------: | ---------------: | ----------------: |
-|  64 MiB |     low    |     202 |       255 |        277 |        282 |               41 |                79 |
-|  64 MiB |   middle   |     104 |       104 |        112 |        111 |               39 |                77 |
-|  64 MiB |    high    |      58 |        58 |         61 |         60 |               40 |                79 |
-| 256 MiB |     low    |     587 |       568 |    **795** |        755 |               44 |               144 |
-| 256 MiB |   middle   |     321 |       311 |        374 |        367 |               46 |               198 |
-| 256 MiB |    high    |     198 |       195 |        219 |        217 |               44 |               138 |
+|    Size   |  Difficulty  |  enc f→f  |  dec f→out  |   enc in→out  |  dec in→out  |
+| :-------: | :----------: | --------: | ----------: | ------------: | -----------: |
+|  256 MiB  |    low       |   868.33  |     910.05  |      1709.13  |     1519.16  |
+|  256 MiB  |    middle    |   995.48  |     910.46  |  **1810.27**  |     1585.49  |
+|  256 MiB  |    high      |   899.43  |     866.88  |      1658.29  |     1409.89  |
 
 </details>
 
 <details>
-<summary><strong>Scheme 1</strong> — XChaCha20-Poly1305 (noble/ciphers)</summary>
+<summary><strong>Stream‑only Throughput (KDF‑subtracted) — Scheme 1</strong></summary>
 
-**Higher is faster (MiB/s). Decode columns are latency (ms).**
+**Higher is better (MiB/s).**
 
-|   Size  | Difficulty | enc f→f | dec f→out | enc in→out | dec in→out | decode file (ms) | decode stdin (ms) |
-| :-----: | :--------: | ------: | --------: | ---------: | ---------: | ---------------: | ----------------: |
-|  64 MiB |     low    |     103 |       103 |        106 |        107 |               40 |                68 |
-|  64 MiB |   middle   |      72 |        71 |         76 |         75 |               40 |                69 |
-|  64 MiB |    high    |      49 |        49 |         52 |         51 |               40 |                74 |
-| 256 MiB |     low    |     137 |       140 |    **152** |        149 |               45 |               133 |
-| 256 MiB |   middle   |     122 |       122 |        131 |        130 |               44 |               145 |
-| 256 MiB |    high    |     101 |       103 |        109 |        108 |               44 |               137 |
+|    Size   |  Difficulty  |  enc f→f  |  dec f→out  |  enc in→out  |  dec in→out  |
+| :-------: | :----------: | --------: | ----------: | -----------: | -----------: |
+|  256 MiB  |    low       |   149.33  |     153.01  |      167.36  |      164.99  |
+|  256 MiB  |    middle    |   154.23  |     154.72  |  **169.55**  |      162.91  |
+|  256 MiB  |    high      |   149.83  |     151.26  |      157.55  |      163.05  |
 
 </details>
 
-**Legend:**
-`enc f→f` = encrypt file→file • `dec f→out` = decrypt file→stdout • `enc in→out` = encrypt stdin→stdout • `dec in→out` = decrypt stdin→stdout.
+<details>
+<summary><strong>Wall‑clock Durations (no subtraction) — Scheme 0</strong></summary>
 
-<sub>Run config: Bun CLI, scheme 0/1, difficulties: low/middle/high, sizes: 64 MiB & 256 MiB, repeats=1 (2025-10-05).</sub>
+**Lower is better (ms / s). Decode columns show latency (ms).**
+
+|    Size   |  Difficulty  |           enc f→f  |         dec f→out  |        enc in→out  |        dec in→out  |  decode file (ms)  |  decode stdin (ms)  |
+| :-------: | :----------: | -----------------: | -----------------: | -----------------: | -----------------: | -----------------: | ------------------: |
+|  256 MiB  |    low       |   469 ms / 0.47 s  |   456 ms / 0.46 s  |   324 ms / 0.32 s  |   343 ms / 0.34 s  |                45  |                153  |
+|  256 MiB  |    middle    |   798 ms / 0.80 s  |   822 ms / 0.82 s  |   682 ms / 0.68 s  |   702 ms / 0.70 s  |                46  |                190  |
+|  256 MiB  |    high      |  1298 ms / 1.30 s  |  1308 ms / 1.31 s  |  1167 ms / 1.17 s  |  1195 ms / 1.19 s  |                45  |                178  |
+
+</details>
+
+<details>
+<summary><strong>Wall‑clock Durations (no subtraction) — Scheme 1</strong></summary>
+
+**Lower is better (ms / s). Decode columns show latency (ms).**
+
+|    Size   |  Difficulty  |           enc f→f  |         dec f→out  |        enc in→out  |        dec in→out  |  decode file (ms)  |  decode stdin (ms)  |
+| :-------: | :----------: | -----------------: | -----------------: | -----------------: | -----------------: | -----------------: | ------------------: |
+|  256 MiB  |    low       |  1881 ms / 1.88 s  |  1840 ms / 1.84 s  |  1697 ms / 1.70 s  |  1719 ms / 1.72 s  |                48  |                133  |
+|  256 MiB  |    middle    |  2103 ms / 2.10 s  |  2097 ms / 2.10 s  |  1953 ms / 1.95 s  |  2014 ms / 2.01 s  |                48  |                180  |
+|  256 MiB  |    high      |  2534 ms / 2.53 s  |  2518 ms / 2.52 s  |  2450 ms / 2.45 s  |  2396 ms / 2.40 s  |                49  |                190  |
+
+</details>
+
+**Legend**
+`enc f→f` = encrypt file→file • `dec f→out` = decrypt file→stdout • `enc in→out` = encrypt stdin→stdout • `dec in→out` = decrypt stdin→stdout.
+
+**Method notes**
+• CLI: `bun run cli:run`  • Difficulties: low/middle/high  • Size: 256 MiB  • Repeats: 1
+• **KDF repeats = 3**, payload = 16 bytes. “Stream‑only” removes the measured KDF baseline for the respective difficulty; wall‑clock shows full end‑to‑end time.
+
 
 ---
 
