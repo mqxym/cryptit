@@ -1,12 +1,13 @@
 import type { CryptoProvider } from '../providers/CryptoProvider.js';
 import type { PaddingScheme } from '../algorithms/padding/magic48ver-crc8.js';
 import type { PaddingAADMode } from '../algorithms/encryption/base/BaseAEADWithPadAAD.js';
+import { CryptoKeyLike } from './crypto-key-like.js';
 
 /* ------------------------- Encryption engine ------------------------- */
 export interface EncryptionAlgorithm {
   encryptChunk(plain : Uint8Array): Promise<Uint8Array>;
   decryptChunk(cipher: Uint8Array): Promise<Uint8Array>;
-  setKey(k: CryptoKey): Promise<void>;
+  setKey(k: CryptoKeyLike): Promise<void>;
   zeroKey(): void;
   setAAD(aadData: Uint8Array): void; //set additional data (header)
   readonly IV_LENGTH: number;
@@ -32,7 +33,7 @@ export interface KeyDerivation<D extends string = string> {
     salt       : Uint8Array,
     difficulty : D,
     provider   : CryptoProvider,
-  ): Promise<CryptoKey>;
+  ): Promise<CryptoKeyLike>;
 }
 
 export interface CipherConstructor {
