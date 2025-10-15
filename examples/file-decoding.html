@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Cryptit Browser Demo - Encrypted File Decoding</title>
+  <link rel="icon" href="./favicon.ico" type="image/x-icon">
+  <!-- Bootstrap 5 -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  >
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    pre { font-family: monospace; white-space: pre-wrap; word-break: break-word; }
+    .dropzone { border: 2px dashed #ced4da; border-radius: .5rem; padding: 2rem; text-align: center; transition: background-color .15s, border-color .15s; }
+    .dropzone.dragover { background-color: #f8f9fa; border-color: #86b7fe; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+</head>
+
+<body>
+  <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="#">Cryptit Demo</a>
+      <button
+        class="navbar-toggler"
+        type="button"
+        data-bs-toggle="collapse"
+        data-bs-target="#demoNav"
+        aria-controls="demoNav"
+        aria-expanded="false"
+        aria-label="Toggle navigation"
+      >
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="collapse navbar-collapse" id="demoNav">
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+          <li class="nav-item">
+            <a class="nav-link" href="text-encryption.html">Text Encryption</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="text-decoding.html">Text Decoding</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="file-encryption.html">File</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="streaming.html">File (Streaming)</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link active" aria-current="page" href="file-decoding.html">File Decoding</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1 class="mb-1">@mqyxm/cryptit</h1>
+    <h2 class="mb-4">Header &amp; Payload Inspection (Files)</h2>
+
+    <!-- Input: file picker + dropzone -->
+    <div class="row g-3 mb-3">
+      <div class="col-md-6">
+        <label for="fileInput" class="form-label">Choose encrypted files</label>
+        <input id="fileInput" class="form-control" type="file" multiple>
+        <div class="form-text">Select one or more Cryptit-encrypted files (with embedded header).</div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Or drag &amp; drop</label>
+        <div id="dropZone" class="dropzone">Drop files here</div>
+      </div>
+    </div>
+
+    <!-- Buttons -->
+    <div class="mb-3 d-flex align-items-center gap-2">
+      <button id="headerBtn" class="btn btn-primary">Decode Header</button>
+      <button id="dataBtn" class="btn btn-secondary">Decode Data</button>
+      <button id="clearBtn" class="btn btn-outline-danger ms-auto">Clear results</button>
+    </div>
+
+    <!-- Results -->
+    <div id="results" class="vstack gap-3"></div>
+
+    <!-- Error -->
+    <div id="errBox" class="alert alert-danger d-none mt-3"></div>
+  </div>
+
+  <!-- Import browser bundle (Cryptit provides blob-accepting decode APIs) -->
+  <script type="module">
+    import { Cryptit } from "./assets/cryptit.browser.min.js";
+    window.Cryptit = Cryptit;
+  </script>
+
+  <!-- Demo logic -->
+  <script type="module">
+    const { Cryptit } = window;
+
+    // Shortcuts
+    const $ = (id) => document.getElementById(id);
+    const els = {
+      fileInput: $('fileInput'),
+      dropZone: $('dropZone'),
+      results: $('results'),
+      err: $('errBox'),
+      headerBtn: $('headerBtn'),
+      dataBtn: $('dataBtn'),
+      clearBtn: $('clearBtn'),
+    };
+
+    // UI helpers
+    function showErr(msg) {
+      els.err.textContent = msg || 'Something went wrong.';
+      els.err.classList.remove('d-none');
+    }
+    function clearErr() {
+      els.err.textContent = '';
+      els.err.classList.add('d-none');
+    }
+    function clearResults() {
+      els.results.innerHTML = '';
+      clearErr();
+    }
+    function formatBytes(bytes) {
+      if (!Number.isFinite(bytes)) return '-';
+      const u = ['B','KB','MB','GB','TB'];
+      const i = bytes === 0 ? 0 : Math.floor(Math.log(bytes) / Math.log(1024));
+      return `${(bytes / 1024**i).toFixed(2)} ${u[i]}`;
+    }
+    function u8ToB64(u8) {
+      // Chunked conversion to avoid call stack limits
+      let bin = '';
+      const CHUNK = 0x8000;
+      for (let i = 0; i < u8.length; i += CHUNK) {
+        bin += String.fromCharCode.apply(null, u8.subarray(i, i + CHUNK));
+      }
+      return btoa(bin);
+    }
+
+    function getFiles() {
+      return Array.from(els.fileInput.files || []);
+    }
+    function addFilesFromDataTransfer(dt) {
+      const files = Array.from(dt.files || []);
+      if (!files.length) return;
+      const current = new DataTransfer();
+      Array.from(els.fileInput.files || []).forEach(f => current.items.add(f));
+      files.forEach(f => current.items.add(f));
+      els.fileInput.files = current.files;
+    }
+
+    function card({ title, subtitle, badge, body }) {
+      const div = document.createElement('div');
+      div.className = 'card';
+      div.innerHTML = `
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div>
+            <strong>${title}</strong>
+            <div class="text-muted small">${subtitle || ''}</div>
+          </div>
+          ${badge ? `<span class="badge text-bg-secondary">${badge}</span>` : ''}
+        </div>
+        <div class="card-body"><pre class="mb-0">${body}</pre></div>
+      `;
+      return div;
+    }
+
+    function pretty(obj) {
+      return JSON.stringify(obj, null, 2);
+    }
+
+    async function decodeHeaderForFiles() {
+      clearErr();
+      const files = getFiles();
+      if (!files.length) { showErr('Please choose at least one encrypted file.'); return; }
+
+      els.results.innerHTML = '';
+      for (const file of files) {
+        try {
+          const meta = await Cryptit.decodeHeader(file);
+          // Hide raw salt bytes for brevity if present
+          if (meta && 'saltBytes' in meta) delete meta.saltBytes;
+          const body = pretty(meta);
+          els.results.prepend(card({
+            title: file.name || 'file',
+            subtitle: `Header • ${formatBytes(file.size)}`,
+            badge: 'decodeHeader',
+            body,
+          }));
+        } catch (e) {
+          els.results.prepend(card({
+            title: file.name || 'file',
+            subtitle: `Header • ${formatBytes(file.size)}`,
+            badge: 'error',
+            body: (e?.message ?? String(e)),
+          }));
+        }
+      }
+    }
+
+    async function decodeDataForFiles() {
+      clearErr();
+      const files = getFiles();
+      if (!files.length) { showErr('Please choose at least one encrypted file.'); return; }
+
+      els.results.innerHTML = '';
+      for (const file of files) {
+        try {
+          const info = await Cryptit.decodeData(file);
+
+          // For nicer display, convert small Uint8Arrays to Base64 when not chunked
+          if (!info?.isChunked && info?.params) {
+            const p = info.params;
+            if (p.iv && p.iv instanceof Uint8Array) p.iv = u8ToB64(p.iv);
+            if (p.tag && p.tag instanceof Uint8Array) p.tag = u8ToB64(p.tag);
+          }
+
+          const body = pretty(info);
+          els.results.prepend(card({
+            title: file.name || 'file',
+            subtitle: `Data • ${formatBytes(file.size)}`,
+            badge: 'decodeData',
+            body,
+          }));
+        } catch (e) {
+          els.results.prepend(card({
+            title: file.name || 'file',
+            subtitle: `Data • ${formatBytes(file.size)}`,
+            badge: 'error',
+            body: (e?.message ?? String(e)),
+          }));
+        }
+      }
+    }
+
+    // Drag & drop wiring
+    ['dragenter','dragover'].forEach(evt => {
+      els.dropZone.addEventListener(evt, (e) => {
+        e.preventDefault(); e.stopPropagation();
+        els.dropZone.classList.add('dragover');
+      });
+    });
+    ['dragleave','drop'].forEach(evt => {
+      els.dropZone.addEventListener(evt, (e) => {
+        e.preventDefault(); e.stopPropagation();
+        if (evt === 'drop') addFilesFromDataTransfer(e.dataTransfer);
+        els.dropZone.classList.remove('dragover');
+      });
+    });
+
+    // Events
+    els.headerBtn.addEventListener('click', decodeHeaderForFiles);
+    els.dataBtn.addEventListener('click', decodeDataForFiles);
+    els.clearBtn.addEventListener('click', clearResults);
+  </script>
+</body>
+</html>
