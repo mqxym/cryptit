@@ -28,8 +28,11 @@ The library can support up to 8 schemes via a header info byte (3 bit allocated)
 
 ## Live Demo
 
-* Encryption / Decryption: [https://mqxym.github.io/cryptit/text-encryption.html](https://mqxym.github.io/cryptit/text-encryption.html)
-* Data Decoding [https://mqxym.github.io/cryptit/text-decoding.html](https://mqxym.github.io/cryptit/text-decoding.html)
+* Text Encryption / Decryption: [https://mqxym.github.io/cryptit/text-encryption.html](https://mqxym.github.io/cryptit/text-encryption.html)
+* Text Data Decoding [https://mqxym.github.io/cryptit/text-decoding.html](https://mqxym.github.io/cryptit/text-decoding.html)
+* File Encryption / Decryption [https://mqxym.github.io/cryptit/file-encryption.html](https://mqxym.github.io/cryptit/file-encryption.html)
+* File Streaming [https://mqxym.github.io/cryptit/streaming.html](https://mqxym.github.io/cryptit/streaming.html)
+* File Data Decoding [https://mqxym.github.io/cryptit/file-decoding.html](https://mqxym.github.io/cryptit/file-decoding.html)
 
 ---
 
