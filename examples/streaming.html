@@ -12,16 +12,9 @@
     rel="stylesheet"
   >
 
-
-
-<script src="https://cdn.jsdelivr.net/npm/web-streams-polyfill@2.0.2/dist/ponyfill.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/streamsaver@2.0.3/StreamSaver.min.js"></script>
-<script>
-  import streamSaver from 'streamsaver'
-  const streamSaver = require('streamsaver')
-  const streamSaver = window.streamSaver
-</script>
-
+  <script src="./assets/streamsaver/StreamSaver.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/web-streams-polyfill@2.0.2/dist/ponyfill.min.js"></script>
+ 
   <script>
     // Required by cryptit to load the Argon2 wasm
     window.loadArgon2WasmBinary = () =>
@@ -48,9 +41,6 @@
   </style>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
-  <!-- Optional streaming download polyfill (uncomment to avoid in-memory blobs on non-Chromium browsers)
-  <script src="https://unpkg.com/streamsaver@2.0.6/StreamSaver.min.js"></script>
-  -->
 </head>
 <body>
   <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
@@ -93,7 +83,8 @@
   <div class="container">
     <h1 class="mb-1">@mqyxm/cryptit</h1>
     <h2 class="mb-4">File Encryption / Decryption — Streaming</h2>
-    <p>Via <a href="https://github.com/jimmywarting/StreamSaver.js">StreamSaver.js</a> or experimental <a href="https://developer.mozilla.org/en-US/docs/Web/API/Window/showSaveFilePicker">showSaveFilePicker()</a></p>
+    <p>Via <a href="https://github.com/jimmywarting/StreamSaver.js">StreamSaver.js</a> or experimental <a href="https://developer.mozilla.org/en-US/docs/Web/API/Window/showSaveFilePicker">showSaveFilePicker()</a>.</p>
+    <p><b>Note:</b> Safari doesn’t support streaming browser-generated data directly to disk (no File System Access API, and service-worker downloads aren’t truly streamed). Libraries must buffer the whole file in memory, which can exhaust RAM for large files. That’s why a safeguard blocks processing over 500&nbsp;MB on Safari. On iOS safari, even smaller files can cause crashes.</p>
 
     <!-- Configuration -->
     <div class="card mb-4">
@@ -184,6 +175,25 @@
     </p>
   </div>
 
+  <div class="modal fade" id="safariLimitModal" tabindex="-1" aria-labelledby="safariLimitLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="safariLimitLabel">Safari limitation for large files</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2"><strong>Short version:</strong> Safari can’t save while the file is being processed. To keep the page stable, files larger than <strong>500&nbsp;MB</strong> aren’t processed here.</p>
+        <ul class="small mb-3" id="safariLimitList" style="max-height:8rem;overflow:auto;"></ul>
+        <p class="small text-muted mb-0"><strong>Technical details:</strong> Safari doesn’t support streaming browser-generated data directly to disk (no File System Access API, and service-worker downloads aren’t truly streamed). Libraries must buffer the whole file in memory, which can exhaust RAM for large files. That’s why this safeguard blocks processing over 500&nbsp;MB on Safari.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+
   <script type="module">
     import { createCryptit } from "./assets/cryptit.browser.min.js";
     window.createCryptit = createCryptit;
@@ -193,7 +203,52 @@
 <script type="module">
   const { createCryptit } = window;
 
-  // ===== Shortcuts & UI Elements =====
+  // ─────────────────────────────────────────────────────────────────────────────
+  // iOS & StreamSaver environment helpers
+  // ─────────────────────────────────────────────────────────────────────────────
+  const isiOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+  // NOTE: Host StreamSaver's mitm.html yourself on the same origin to avoid
+  // Safari/iOS naming quirks (.html appendix) and to keep SW scoped correctly.
+  // Place StreamSaver's mitm.html at /streamsaver/mitm.html
+  function initStreamSaver() {
+    if (!window.streamSaver) return;
+    // Scope the service worker to your origin; prevents iOS saving the MITM page.
+    window.streamSaver.mitm = new URL('./assets/streamsaver/mitm.html', location.href).toString();
+  }
+
+  // StreamSaver present & usable (no FS Access on iOS Safari as of 2025)
+  function supportsStreamSaver() {
+    return !!(window.streamSaver && window.streamSaver.createWriteStream);
+  }
+
+  function streamingSinkAvailable() {
+    // iOS Safari does not support showSaveFilePicker; rely on StreamSaver there.
+    return ('showSaveFilePicker' in window) || supportsStreamSaver();
+  }
+
+  async function createStreamingWritable(filename, size, mime = 'application/octet-stream') {
+    // Prefer FS Access where available (not on iOS Safari).
+    if ('showSaveFilePicker' in window && !isiOS()) {
+      const ext = (filename.match(/\.[a-z0-9]+$/i)?.[0] || '.cryptit').toLowerCase();
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{ description: 'File', accept: { [mime || 'application/octet-stream']: [ext] } }],
+        excludeAcceptAllOption: false
+      });
+      return await handle.createWritable();
+    }
+    if (supportsStreamSaver()) {
+      // Provide size for progress + better finalize behavior in StreamSaver.
+      return window.streamSaver.createWriteStream(filename, { size });
+    }
+    throw new Error('No streaming sink available in this browser.');
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // UI shortcuts
+  // ─────────────────────────────────────────────────────────────────────────────
   const $ = (id) => document.getElementById(id);
   const els = {
     secret: $('secret'),
@@ -210,7 +265,41 @@
     clearBtn: $('clearBtn'),
   };
 
-  // ===== Error UI =====
+  // ===== Safari guard (>= 500 MB) =====
+const SAFARI_LARGE_FILE_LIMIT = 500 * 1024 * 1024; // 500 MB
+
+function isSafari() {
+  const ua = navigator.userAgent;
+  // True for Safari (macOS & iOS), false for Chrome/Edge/Firefox (incl. iOS variants)
+  return /Safari/i.test(ua) && !/Chrome|CriOS|Chromium|Edg|OPR|Brave/i.test(ua);
+}
+
+function filesOverLimit(files, limit = SAFARI_LARGE_FILE_LIMIT) {
+  return files.filter(f => Number.isFinite(f.size) && f.size > limit);
+}
+
+function showSafariLimitModal(blockedFiles) {
+  const list = document.getElementById('safariLimitList');
+  list.innerHTML = blockedFiles
+    .map(f => `<li><code class="kv">${f.name}</code> — ${formatBytes(f.size)}</li>`)
+    .join('') || '<li>No file details available.</li>';
+
+  const modalEl = document.getElementById('safariLimitModal');
+  const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+  modal.show();
+}
+
+/**
+ * Returns true if it is OK to proceed, otherwise shows modal and returns false.
+ */
+function guardSafariLargeFiles(files) {
+  if (!isSafari()) return true;
+  const blocked = filesOverLimit(files);
+  if (blocked.length === 0) return true;
+  showSafariLimitModal(blocked);
+  return false;
+}
+
   function showError(msg) {
     els.error.textContent = `error: ${msg || 'Something went wrong.'}`;
     els.error.classList.remove('d-none');
@@ -220,7 +309,6 @@
     els.error.classList.add('d-none');
   }
 
-  // ===== Config / cryptit factory =====
   function cryptit() {
     return createCryptit({
       scheme: Number(els.scheme.value),
@@ -230,7 +318,6 @@
     });
   }
 
-  // ===== Helpers =====
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   let rowIdCounter = 0;
 
@@ -258,79 +345,48 @@
     const v = (bytes / Math.pow(1024, i));
     return `${v >= 100 ? v.toFixed(0) : v.toFixed(1)} ${units[i]}`;
   }
-
-  function suggestEncName(name = 'file') {
-    return `${name}.cryptit`;
-  }
-  function suggestDecName(name = 'file') {
-    if (name.toLowerCase().endsWith('.cryptit')) return name.slice(0, -8);
-    if (name.toLowerCase().endsWith('.enc')) return name.slice(0, -4);
+  const suggestEncName = (n='file') => `${n}.cryptit`;
+  function suggestDecName(name='file') {
+    const lower = name.toLowerCase();
+    if (lower.endsWith('.cryptit')) return name.slice(0, -8);
+    if (lower.endsWith('.enc')) return name.slice(0, -4);
     return `${name}.decrypted`;
   }
+  const timestamp = () => new Date().toLocaleTimeString();
 
-  function timestamp() {
-    return new Date().toLocaleTimeString();
-  }
-
-  // ===== Progress reporter =====
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Progress helper
+  // ─────────────────────────────────────────────────────────────────────────────
   function makeProgressReporter({ total = 0, interval = 500, onTick, onFinal } = {}) {
-    let transferred = 0;
-    let lastShown = -1;
-    let timer = null;
-
+    let transferred = 0, lastShown = -1, timer = null;
     const emit = (final=false) => {
       if (!final && transferred === lastShown) return;
       lastShown = transferred;
       const pct = total ? (transferred / total) * 100 : 0;
       onTick?.({ transferred, total, pct });
     };
-
     return {
-      start() { if (!timer) { timer = setInterval(() => emit(false), interval); } },
+      start() { if (!timer) timer = setInterval(() => emit(false), interval); },
       add(n) { transferred += n; },
-      stop(finalMsg = '') {
-        if (timer) { clearInterval(timer); timer = null; }
-        emit(true);
-        onFinal?.({ transferred, total, msg: finalMsg });
-      }
+      stop(finalMsg='') { if (timer) { clearInterval(timer); timer = null; } emit(true); onFinal?.({ transferred, total, msg: finalMsg }); }
     };
   }
 
-  // ===== Streaming sink (REQUIRED) =====
-  function supportsStreamSaver() {
-    return !!(window.streamSaver && window.streamSaver.createWriteStream);
-  }
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Table row
+  // ─────────────────────────────────────────────────────────────────────────────
+  const rowsByKey = new Map(); // key: `${op}|${name}|${size}|${lastModified}`
 
-  function streamingSinkAvailable() {
-    return ('showSaveFilePicker' in window) || supportsStreamSaver();
-  }
+  function makeRowWithLog({ file, opInitial, sizeInitial, noteInitial }) {
+    const key = `${opInitial}|${file.name}|${file.size}|${file.lastModified}`;
+    if (rowsByKey.has(key)) return rowsByKey.get(key);
 
-  async function createStreamingWritable(filename, mime = 'application/octet-stream') {
-    // Prefer File System Access API
-    if ('showSaveFilePicker' in window) {
-      const handle = await window.showSaveFilePicker({
-        suggestedName: filename,
-        types: [{ description: 'Binary', accept: { [mime]: ['.cryptit', '.*'] } }]
-      });
-      return await handle.createWritable(); // FileSystemWritableFileStream (WritableStream)
-    }
-    // Fallback to StreamSaver
-    if (supportsStreamSaver()) {
-      // Optional: configure StreamSaver mitm path if applicable
-      // window.streamSaver.mitm = '/streamsaver/mitm.html';
-      return window.streamSaver.createWriteStream(filename);
-    }
-    throw new Error('No streaming sink available in this browser.');
-  }
-
-  // ===== Rows with collapsible per-file log =====
-  function makeRowWithLog({ fileName, opInitial, sizeInitial, noteInitial }) {
     const id = ++rowIdCounter;
     const logId = `log-${id}`;
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td class="file-cell"><span class="text-break">${fileName}</span></td>
+      <td class="file-cell"><span class="text-break">${file.name}</span></td>
       <td class="op-cell">${opInitial || '-'}</td>
       <td class="size-cell">${Number.isFinite(sizeInitial) ? formatBytes(sizeInitial) : '-'}</td>
       <td class="dl-cell">
@@ -370,10 +426,14 @@
       td.appendChild(logBtn);
     }
 
-    return { appendLog, setOp, setSize, setNote, setDownloadContent };
+    const row = { appendLog, setOp, setSize, setNote, setDownloadContent, key };
+    rowsByKey.set(key, row);
+    return row;
   }
 
-  // ===== Chunker =====
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Chunker
+  // ─────────────────────────────────────────────────────────────────────────────
   function chunker(max = 65536, onBytes) {
     return new TransformStream({
       transform(chunk, ctl) {
@@ -387,43 +447,62 @@
     });
   }
 
-  // ===== Encrypt one file (STREAMING SINK REQUIRED) =====
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Finalization helper to solve “stuck on downloading…” (iOS)
+  // ─────────────────────────────────────────────────────────────────────────────
+  async function finalizeWritable(outStream, { graceMs = 800 } = {}) {
+    // Try to use a writer.closed promise when available; otherwise a short grace.
+    try {
+      if (outStream?.getWriter) {
+        const w = outStream.getWriter();
+        // If a writer can be obtained, immediately release it (we only need .closed)
+        w.releaseLock();
+      }
+    } catch {}
+    // Best-effort tiny grace; on iOS the pipeTo() may resolve late.
+    if (isiOS()) await sleep(graceMs);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Encrypt (single-row, iOS-safe naming & completion)
+  // ─────────────────────────────────────────────────────────────────────────────
   async function encryptOneFile(file, pass) {
     const row = makeRowWithLog({
-      fileName: file.name,
-      opInitial: 'Encrypting…',
-      sizeInitial: NaN,
-      noteInitial: 'starting',
+      file, opInitial: 'Encrypting…', sizeInitial: NaN, noteInitial: 'starting'
     });
     row.appendLog(`Begin encryption of ${file.name} (${formatBytes(file.size)})`);
 
     if (!streamingSinkAvailable()) {
       row.setOp('Blocked');
-      row.setNote('No streaming file sink available. Use Chrome/Edge (File System Access) or include StreamSaver.');
-      row.appendLog('Aborting to avoid in-memory buffering of large files.');
+      row.setNote('No streaming sink. Use Chrome/Edge or include StreamSaver.');
+      row.appendLog('Aborted to avoid in-memory buffering.');
       return;
     }
+
+    console.log(isiOS());
+
+    // Initialize StreamSaver env early (mitm path) to avoid iOS ".html" suffix.
+    initStreamSaver();
 
     const c = cryptit();
     const { header, writable, readable } = await c.createEncryptionStream(pass);
-
     const suggested = suggestEncName(file.name || 'file');
+
     let outStream;
     try {
-      outStream = await createStreamingWritable(suggested);
+      outStream = await createStreamingWritable(suggested, header.byteLength + file.size);
     } catch (e) {
-      row.setOp('Blocked');
-      row.setNote('User canceled save or streaming sink unavailable.');
+      row.setOp('Canceled');
+      row.setNote('Save was canceled or streaming sink unavailable.');
       row.appendLog(e?.message ?? String(e));
-      return;
+      return; // IMPORTANT: do not throw → no duplicate error row
     }
 
-    // UI
     row.setDownloadContent('<span class="badge text-bg-secondary">Saving to disk…</span>');
 
     const prog = makeProgressReporter({
       total: file.size,
-      interval: 500,
+      interval: 400,
       onTick: ({ transferred, total, pct }) => {
         const p = total ? `${pct.toFixed(1)}%` : '';
         row.setNote(`encrypted ${formatBytes(transferred)} ${total ? `/ ${formatBytes(total)} (${p})` : ''}`);
@@ -434,67 +513,87 @@
     });
     prog.start();
 
-    // OUTPUT: write header, then stream encrypted body to the same sink
-    // Use writer if available (generic WritableStream), else .write (FS Access also supports it).
+    // Write header first, then stream cipher body
     const writer = outStream.getWriter?.();
-    if (writer && writer.write) {
-      await writer.write(header);
-      writer.releaseLock(); // unlock before pipeTo
-    } else if (typeof outStream.write === 'function') {
-      await outStream.write(header);
-    }
+    try {
+      if (writer?.write) {
+        await writer.write(header);
+        writer.releaseLock();
+      } else if (typeof outStream.write === 'function') {
+        await outStream.write(header);
+      } else {
+        // Fallback: concat header+body via a small ReadableStream
+        const prelude = new ReadableStream({ start(c){ c.enqueue(header); c.close(); } });
+        await prelude.pipeTo(outStream, { preventClose: true });
+      }
 
-    const pumpOut = readable.pipeTo(outStream).then(async () => {
-      if (typeof outStream.close === 'function') await outStream.close();
+      const pumpOut = readable.pipeTo(outStream)
+        .catch(e => { throw e; });
+
+      const pumpIn = file.stream()
+        .pipeThrough(chunker(65536, n => prog.add(n)))
+        .pipeTo(writable)
+        .catch(e => { throw e; });
+
+      await Promise.all([pumpIn, pumpOut]);
+      prog.stop('complete');
+
+      await finalizeWritable(outStream, { graceMs: 800 });
+      if (typeof outStream.close === 'function') await outStream.close().catch(()=>{});
+
+      row.setOp('Encrypted');
+      row.setNote('Header embedded; MIME: application/octet-stream');
       row.setDownloadContent('<span class="badge text-bg-success">Saved to disk</span>');
-    });
-
-    // INPUT: plaintext → cryptit's writable (with progress)
-    const pumpIn = file.stream().pipeThrough(chunker(65536, n => prog.add(n))).pipeTo(writable);
-
-    await Promise.all([pumpIn, pumpOut]);
-    prog.stop('complete');
-    row.setOp('Encrypted');
-    row.setNote('Header embedded; MIME: application/octet-stream');
-    row.appendLog('Encryption complete');
+      row.appendLog('Encryption complete');
+    } catch (e) {
+      prog.stop('error');
+      try { if (typeof outStream?.abort === 'function') await outStream.abort(e); } catch {}
+      row.setOp('Error');
+      row.setNote((e?.message ?? String(e)));
+      row.appendLog(`error: ${e?.message ?? String(e)}`);
+      // IMPORTANT: swallow error here to avoid duplicate "Error" rows from caller
+    }
   }
 
-  // ===== Decrypt one file (STREAMING SINK REQUIRED) =====
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Decrypt (single-row, iOS completion)
+  // ─────────────────────────────────────────────────────────────────────────────
   async function decryptOneFile(file, pass) {
     const row = makeRowWithLog({
-      fileName: file.name,
-      opInitial: 'Decrypting…',
-      sizeInitial: NaN,
-      noteInitial: 'starting',
+      file, opInitial: 'Decrypting…', sizeInitial: NaN, noteInitial: 'starting'
     });
     row.appendLog(`Begin decryption of ${file.name} (${formatBytes(file.size)})`);
 
     if (!streamingSinkAvailable()) {
       row.setOp('Blocked');
-      row.setNote('No streaming file sink available. Use Chrome/Edge (File System Access) or include StreamSaver.');
-      row.appendLog('Aborting to avoid in-memory buffering of large files.');
+      row.setNote('No streaming sink. Use Chrome/Edge or include StreamSaver.');
+      row.appendLog('Aborted to avoid in-memory buffering.');
       return;
     }
 
+    initStreamSaver();
+
     const c = cryptit();
-    const dec = await c.createDecryptionStream(pass); // Use once per file
+    const dec = await c.createDecryptionStream(pass);
 
     const outName = suggestDecName(file.name || 'file');
+
     let outStream;
     try {
-      outStream = await createStreamingWritable(outName);
+      // Note: ciphertext size progress baseline; plaintext size is unknown until done
+      outStream = await createStreamingWritable(outName, file.size);
     } catch (e) {
-      row.setOp('Blocked');
-      row.setNote('User canceled save or streaming sink unavailable.');
+      row.setOp('Canceled');
+      row.setNote('Save was canceled or streaming sink unavailable.');
       row.appendLog(e?.message ?? String(e));
-      return;
+      return; // avoid duplicate row
     }
 
     row.setDownloadContent('<span class="badge text-bg-secondary">Saving to disk…</span>');
 
     const prog = makeProgressReporter({
-      total: file.size, // ciphertext progress baseline
-      interval: 500,
+      total: file.size,
+      interval: 400,
       onTick: ({ transferred, total, pct }) => {
         const p = total ? `${pct.toFixed(1)}%` : '';
         row.setNote(`processed ${formatBytes(transferred)} ${total ? `/ ${formatBytes(total)} (${p})` : ''}`);
@@ -505,53 +604,58 @@
     });
     prog.start();
 
-    // One pipeline: ciphertext → count → decrypt → sink
-    await file.stream()
-      .pipeThrough(chunker(65536, n => prog.add(n)))
-      .pipeThrough(dec)
-      .pipeTo(outStream)
-      .then(async () => {
-        if (typeof outStream.close === 'function') await outStream.close();
-        row.setDownloadContent('<span class="badge text-bg-success">Saved to disk</span>');
-      });
+    try {
+      await file.stream()
+        .pipeThrough(chunker(65536, n => prog.add(n)))
+        .pipeThrough(dec)
+        .pipeTo(outStream);
 
-    prog.stop('complete');
-    row.setOp('Decrypted');
-    row.setNote('Derived from embedded parameters');
-    row.appendLog('Decryption complete');
+      prog.stop('complete');
+
+      await finalizeWritable(outStream, { graceMs: 800 });
+      if (typeof outStream.close === 'function') await outStream.close().catch(()=>{});
+
+      row.setOp('Decrypted');
+      row.setNote('Derived from embedded parameters');
+      row.setDownloadContent('<span class="badge text-bg-success">Saved to disk</span>');
+      row.appendLog('Decryption complete');
+    } catch (e) {
+      prog.stop('error');
+      try { if (typeof outStream?.abort === 'function') await outStream.abort(e); } catch {}
+      row.setOp('Error');
+      row.setNote((e?.message ?? String(e)));
+      row.appendLog(`error: ${e?.message ?? String(e)}`);
+      // swallow to avoid duplicate rows
+    }
   }
 
-  // ===== Actions (multi-file) =====
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Multi-file actions (no duplicate error rows)
+  // ─────────────────────────────────────────────────────────────────────────────
+  function getSelectedFiles() {
+    return Array.from(els.fileInput.files || []);
+  }
+
   async function encryptFiles() {
     clearError();
     const pass = els.secret.value;
     if (!pass) { showError('Passphrase is required'); return; }
 
-    const files = Array.from(els.fileInput.files || []);
+    const files = getSelectedFiles();
     if (!files.length) { showError('Please choose at least one file.'); return; }
 
+    if (!guardSafariLargeFiles(files)) return;
+
     if (!streamingSinkAvailable()) {
-      showError('A streaming file sink is required. Use Chrome/Edge (File System Access) or include StreamSaver.');
+      showError('A streaming sink is required. Use Chrome/Edge or include StreamSaver.');
       return;
     }
 
     await setBusy(els.encryptBtn, true);
     try {
       for (const file of files) {
-        try {
-          await encryptOneFile(file, pass);
-        } catch (e) {
-          const row = makeRowWithLog({
-            fileName: file.name,
-            opInitial: 'Error',
-            sizeInitial: file.size,
-            noteInitial: (e?.message ?? String(e)),
-          });
-          row.appendLog(`error: ${e?.message ?? String(e)}`);
-        }
+        await encryptOneFile(file, pass); // internal errors handled per-row
       }
-    } catch (e) {
-      showError(e?.message ?? String(e));
     } finally {
       await setBusy(els.encryptBtn, false);
     }
@@ -562,31 +666,21 @@
     const pass = els.secret.value;
     if (!pass) { showError('Passphrase is required'); return; }
 
-    const files = Array.from(els.fileInput.files || []);
+    const files = getSelectedFiles();
     if (!files.length) { showError('Please choose at least one encrypted file.'); return; }
 
+    if (!guardSafariLargeFiles(files)) return;
+
     if (!streamingSinkAvailable()) {
-      showError('A streaming file sink is required. Use Chrome/Edge (File System Access) or include StreamSaver.');
+      showError('A streaming sink is required. Use Chrome/Edge or include StreamSaver.');
       return;
     }
 
     await setBusy(els.decryptBtn, true);
     try {
       for (const file of files) {
-        try {
-          await decryptOneFile(file, pass);
-        } catch (e) {
-          const row = makeRowWithLog({
-            fileName: file.name,
-            opInitial: 'Error',
-            sizeInitial: file.size,
-            noteInitial: (e?.message ?? String(e)),
-          });
-          row.appendLog(`error: ${e?.message ?? String(e)}`);
-        }
+        await decryptOneFile(file, pass); // internal errors handled per-row
       }
-    } catch (e) {
-      showError(e?.message ?? String(e));
     } finally {
       await setBusy(els.decryptBtn, false);
     }
@@ -594,11 +688,14 @@
 
   function clearResults() {
     els.resultsBody.innerHTML = '';
+    rowsByKey.clear();
     clearError();
     els.fileInput.value = '';
   }
 
-  // ===== Drag & drop wiring =====
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Drag & drop
+  // ─────────────────────────────────────────────────────────────────────────────
   function addFilesFromDataTransfer(dt) {
     const files = Array.from(dt.files || []);
     if (!files.length) return;
@@ -609,26 +706,27 @@
   }
   ['dragenter','dragover'].forEach(evt => {
     els.dropZone.addEventListener(evt, (e) => {
-      e.preventDefault();
-      e.stopPropagation();
+      e.preventDefault(); e.stopPropagation();
       els.dropZone.classList.add('dragover');
     });
   });
   ['dragleave','drop'].forEach(evt => {
     els.dropZone.addEventListener(evt, (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (evt === 'drop') {
-        addFilesFromDataTransfer(e.dataTransfer);
-      }
+      e.preventDefault(); e.stopPropagation();
+      if (evt === 'drop') addFilesFromDataTransfer(e.dataTransfer);
       els.dropZone.classList.remove('dragover');
     });
   });
 
-  // ===== Events =====
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Events
+  // ─────────────────────────────────────────────────────────────────────────────
   els.encryptBtn.addEventListener('click', encryptFiles);
   els.decryptBtn.addEventListener('click', decryptFiles);
   els.clearBtn.addEventListener('click', clearResults);
+
+  // One-time init for StreamSaver
+  initStreamSaver();
 </script>
 </body>
 </html>
