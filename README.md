@@ -252,6 +252,18 @@ cd cryptit
 bun install && bun run build && bun test
 ```
 
+### End-to-End (E2E) Tests
+
+To run the end-to-end tests for the browser examples, you'll need Python 3 and the `pyppeteer` package.
+
+```bash
+# Install pyppeteer
+pip install pyppeteer
+
+# Run the e2e tests
+bun run test:e2e
+```
+
 ---
 
 ## Security
