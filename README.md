@@ -4,7 +4,7 @@
 
 Modern, cross-platform encryption for both **files** *and* **text**.
 
-* **Node 18 / Bun 1** - native `argon2` addon + WebCrypto
+* **Node 22 / Bun 1** - native `argon2` addon + WebCrypto
 * **Browser (evergreen)** - tiny WASM build of `argon2-browser`
 * **CLI** - stream encryption & decryption, zero memory bloat
 * **TypeScript-first**, tree-shakable, ESM & CJS builds

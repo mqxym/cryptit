@@ -252,13 +252,29 @@ For large files, please use the <a href="streaming.html"> streaming</a> version 
 
     function makeRow({fileName, op, size, link, note}) {
       const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td><span class="text-break">${fileName}</span></td>
-        <td>${op}</td>
-        <td>${formatBytes(size)}</td>
-        <td>${link || ''}</td>
-        <td><small class="text-muted">${note || ''}</small></td>
-      `;
+
+      const fileNameTd = document.createElement('td');
+      const fileNameSpan = document.createElement('span');
+      fileNameSpan.className = 'text-break';
+      fileNameSpan.textContent = fileName;
+      fileNameTd.append(fileNameSpan);
+
+      const opTd = document.createElement('td');
+      opTd.textContent = op;
+
+      const sizeTd = document.createElement('td');
+      sizeTd.textContent = formatBytes(size);
+
+      const linkTd = document.createElement('td');
+      if (link) linkTd.innerHTML = link; // Assumes link is trusted HTML
+
+      const noteTd = document.createElement('td');
+      const noteSmall = document.createElement('small');
+      noteSmall.className = 'text-muted';
+      noteSmall.textContent = note || '';
+      noteTd.append(noteSmall);
+
+      tr.append(fileNameTd, opTd, sizeTd, linkTd, noteTd);
       els.resultsBody.prepend(tr); // newest on top
     }
 

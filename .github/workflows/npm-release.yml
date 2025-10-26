@@ -124,7 +124,7 @@ jobs:
           Write-Host "Created $archiveName"
 
       - name: Upload artifact (${{ matrix.target }})
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: cryptit-cli-${{ matrix.target }}-v${{ steps.pkg_ver.outputs.version }}
           path: |
@@ -139,7 +139,7 @@ jobs:
 
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           path: dist
 

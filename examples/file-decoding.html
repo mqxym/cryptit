@@ -154,16 +154,35 @@
     function card({ title, subtitle, badge, body }) {
       const div = document.createElement('div');
       div.className = 'card';
-      div.innerHTML = `
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <div>
-            <strong>${title}</strong>
-            <div class="text-muted small">${subtitle || ''}</div>
-          </div>
-          ${badge ? `<span class="badge text-bg-secondary">${badge}</span>` : ''}
-        </div>
-        <div class="card-body"><pre class="mb-0">${body}</pre></div>
-      `;
+
+      const header = document.createElement('div');
+      header.className = 'card-header d-flex justify-content-between align-items-center';
+
+      const headerLeft = document.createElement('div');
+      const titleEl = document.createElement('strong');
+      titleEl.textContent = title;
+      const subtitleEl = document.createElement('div');
+      subtitleEl.className = 'text-muted small';
+      subtitleEl.textContent = subtitle || '';
+      headerLeft.append(titleEl, subtitleEl);
+
+      header.append(headerLeft);
+
+      if (badge) {
+        const badgeEl = document.createElement('span');
+        badgeEl.className = 'badge text-bg-secondary';
+        badgeEl.textContent = badge;
+        header.append(badgeEl);
+      }
+
+      const cardBody = document.createElement('div');
+      cardBody.className = 'card-body';
+      const pre = document.createElement('pre');
+      pre.className = 'mb-0';
+      pre.textContent = body;
+      cardBody.append(pre);
+
+      div.append(header, cardBody);
       return div;
     }
 

@@ -280,9 +280,21 @@ function filesOverLimit(files, limit = SAFARI_LARGE_FILE_LIMIT) {
 
 function showSafariLimitModal(blockedFiles) {
   const list = document.getElementById('safariLimitList');
-  list.innerHTML = blockedFiles
-    .map(f => `<li><code class="kv">${f.name}</code> — ${formatBytes(f.size)}</li>`)
-    .join('') || '<li>No file details available.</li>';
+  list.innerHTML = ''; // Clear previous
+  if (blockedFiles && blockedFiles.length > 0) {
+    blockedFiles.forEach(f => {
+      const li = document.createElement('li');
+      const code = document.createElement('code');
+      code.className = 'kv';
+      code.textContent = f.name;
+      li.append(code, ` — ${formatBytes(f.size)}`);
+      list.append(li);
+    });
+  } else {
+    const li = document.createElement('li');
+    li.textContent = 'No file details available.';
+    list.append(li);
+  }
 
   const modalEl = document.getElementById('safariLimitModal');
   const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
@@ -385,23 +397,52 @@ function guardSafariLargeFiles(files) {
     const logId = `log-${id}`;
 
     const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td class="file-cell"><span class="text-break">${file.name}</span></td>
-      <td class="op-cell">${opInitial || '-'}</td>
-      <td class="size-cell">${Number.isFinite(sizeInitial) ? formatBytes(sizeInitial) : '-'}</td>
-      <td class="dl-cell">
-        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#${logId}" aria-expanded="false">Log</button>
-      </td>
-      <td class="notes-cell"><small class="text-muted">${noteInitial || ''}</small></td>
-    `;
+
+    const fileCell = document.createElement('td');
+    fileCell.className = 'file-cell';
+    const fileSpan = document.createElement('span');
+    fileSpan.className = 'text-break';
+    fileSpan.textContent = file.name;
+    fileCell.appendChild(fileSpan);
+
+    const opCell = document.createElement('td');
+    opCell.className = 'op-cell';
+    opCell.textContent = opInitial || '-';
+
+    const sizeCell = document.createElement('td');
+    sizeCell.className = 'size-cell';
+    sizeCell.textContent = Number.isFinite(sizeInitial) ? formatBytes(sizeInitial) : '-';
+
+    const dlCell = document.createElement('td');
+    dlCell.className = 'dl-cell';
+    const logButton = document.createElement('button');
+    logButton.className = 'btn btn-sm btn-outline-secondary';
+    logButton.setAttribute('data-bs-toggle', 'collapse');
+    logButton.setAttribute('data-bs-target', `#${logId}`);
+    logButton.setAttribute('aria-expanded', 'false');
+    logButton.textContent = 'Log';
+    dlCell.appendChild(logButton);
+
+    const notesCell = document.createElement('td');
+    notesCell.className = 'notes-cell';
+    const notesSmall = document.createElement('small');
+    notesSmall.className = 'text-muted';
+    notesSmall.textContent = noteInitial || '';
+    notesCell.appendChild(notesSmall);
+
+    tr.append(fileCell, opCell, sizeCell, dlCell, notesCell);
+
     const logRow = document.createElement('tr');
     logRow.className = 'collapse';
     logRow.id = logId;
-    logRow.innerHTML = `
-      <td colspan="5">
-        <textarea class="form-control log-textarea" rows="6" readonly></textarea>
-      </td>
-    `;
+    const logCell = document.createElement('td');
+    logCell.colSpan = 5;
+    const logTextarea = document.createElement('textarea');
+    logTextarea.className = 'form-control log-textarea';
+    logTextarea.rows = 6;
+    logTextarea.readOnly = true;
+    logCell.appendChild(logTextarea);
+    logRow.appendChild(logCell);
     els.resultsBody.prepend(logRow);
     els.resultsBody.prepend(tr);
 
