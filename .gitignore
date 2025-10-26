@@ -9,3 +9,5 @@ scan*.md
 *.mp4
 local-compiled/
 tests/.cryptit-perf-work/*
+.venv/
+__pycache__/

@@ -33,7 +33,7 @@
         "build:js": "bun run bun.build.js",
         "dev": "bun build bun.build.js --watch",
         "test": "bun test",
-        "test:e2e": "python3 tests/e2e_text_tests.py",
+        "test-example:e2e": "E2E_HEADLESS=0 python3 -m unittest -v tests/examples_text_e2e_tests.py",
         "audit": "bun audit",
         "lint": "eslint . --ext .ts",
         "cli:run": "bun run packages/node-runtime/src/cli.ts"
