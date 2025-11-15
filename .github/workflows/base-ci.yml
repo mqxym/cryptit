@@ -1,10 +1,10 @@
 name: Base CI
 on:
   push:
-    branches-ignore:
-      - 'gh-pages'
+    branches:
+      - main
   pull_request:
-    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 jobs:
   codeql:
@@ -35,7 +35,27 @@ jobs:
         with:
           bun-version: latest
       - run: bun ci
-      - run: bun lint || true
+      - name: Full Lint 
+        run: |
+          echo "## Lint results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          bun lint 2>&1 | tee lint.log || true
+          {
+            echo '```'
+            cat lint.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
       - run: bun test  --timeout 20000
-      - run: bun audit
+      - name: Full Audit
+        run: |
+          echo "## Audit results (all severities)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          bun audit 2>&1 | tee audit.log || true
+          {
+            echo '```'
+            cat audit.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - run: bun audit --audit-level=high
       - run: bun run build
