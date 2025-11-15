@@ -20,6 +20,9 @@ export default [
     ignores: ['**/build/**'],
   },
   {
+    ignores: ['examples/**'],
+  },
+  {
     files: ['*/packages/*/*.ts'],
     languageOptions: {
       parser: tsParser,

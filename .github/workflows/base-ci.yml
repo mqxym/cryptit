@@ -39,7 +39,7 @@ jobs:
         run: |
           echo "## Lint results" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          bun lint 2>&1 | tee lint.log || true
+          bun run lint 2>&1 | tee lint.log || true
           {
             echo '```'
             cat lint.log
