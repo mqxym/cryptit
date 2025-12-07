@@ -58,7 +58,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -172,7 +172,7 @@ jobs:
       id-token: write
       contents: read
     steps:
-        - uses: actions/checkout@v5
+        - uses: actions/checkout@v6
 
         - uses: oven-sh/setup-bun@v2
           with:
@@ -185,7 +185,7 @@ jobs:
         - uses: actions/setup-node@v6
           with:
             registry-url: https://registry.npmjs.org/
-            node-version: 20
+            node-version: 22
             scope: '@mqxym'
 
         - run: npm publish --access public --provenance
