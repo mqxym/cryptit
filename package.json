@@ -39,7 +39,7 @@
         "cli:run": "bun run packages/node-runtime/src/cli.ts"
     },
     "engines": {
-        "bun": ">=1.0.0",
+        "bun": ">=1.2.22",
         "node": ">=22"
     },
     "dependencies": {
