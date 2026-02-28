@@ -124,7 +124,7 @@ jobs:
           Write-Host "Created $archiveName"
 
       - name: Upload artifact (${{ matrix.target }})
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: cryptit-cli-${{ matrix.target }}-v${{ steps.pkg_ver.outputs.version }}
           path: |
