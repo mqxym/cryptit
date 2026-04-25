@@ -4,3 +4,4 @@ export declare function base64Decode(b64: string): Uint8Array;
 export declare function zeroizeString(ref: {
     value: string;
 }): void;
+export declare function asArrayBufferView(bytes: Uint8Array): Uint8Array<ArrayBuffer>;

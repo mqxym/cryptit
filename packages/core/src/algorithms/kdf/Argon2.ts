@@ -3,6 +3,7 @@ import type { KeyDerivation } from '../../types/index.js';
 import { argon2id, type Argon2Tuning } from './argon2-wrapper.js';
 import type { CryptoProvider } from '../../providers/CryptoProvider.js';
 import { CryptoKeyLike } from '../../types/crypto-key-like.js';
+import { asArrayBufferView } from '../../util/bytes.js';
 
 /**
  * Argon2-id Key-Derivation Function
@@ -27,10 +28,12 @@ export class Argon2KDF implements KeyDerivation<'low' | 'middle' | 'high'> {
       this.presets[difficulty],
       provider.isNode ? 'node' : 'browser'
     );
-    
+
+    const rawKey = asArrayBufferView(hash);
+
     return provider.subtle.importKey(
       'raw',
-      hash as BufferSource,
+      rawKey,
       { name: 'AES-GCM', length: 256 },
       this.exportExtractable,
       ['encrypt', 'decrypt']

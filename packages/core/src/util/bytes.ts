@@ -74,3 +74,13 @@ export function zeroizeString(ref: { value: string }): void {
   const fill = new Array(len).fill('\0').join('');
   (ref as any).value = fill;            // in -place overwrite
 }
+
+export function asArrayBufferView(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
+  if (bytes.buffer instanceof ArrayBuffer) {
+    return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  }
+
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy;
+}
