@@ -8,6 +8,12 @@ import { encodeFrameLen, FRAME_HEADER_BYTES } from '../util/frame.js';
  *   • collects plaintext into fixed‐size blocks
  *   • encrypts each block
  *   • emits: [4-byte length ‖ encryptedBlock]
+ *
+ * Back-pressure / sizing contract:
+ *   A single write must not exceed `min(chunkSize * 4, 64 MiB)`. Larger writes
+ *   throw a {@link RangeError} synchronously from `transform()` rather than being
+ *   buffered, to bound peak memory. Callers streaming big payloads should write
+ *   in chunks at or below this limit (the surrounding pipeline already does so).
  */
 export class EncryptTransform {
   private buffer = new Uint8Array(0);
@@ -33,7 +39,9 @@ export class EncryptTransform {
     bytes: Uint8Array,
     ctl: TransformStreamDefaultController<Uint8Array>,
   ) {
-    const HARD_LIMIT = 64 * 1024 * 1024; // 64 MiB safety
+    const HARD_LIMIT = 64 * 1024 * 1024; // 64 MiB safety
+    // Per-write cap: reject anything larger than min(chunkSize*4, 64 MiB) so a
+    // single oversized write cannot blow up peak memory (see class docs).
     if (bytes.length > Math.min(this.chunkSize * 4, HARD_LIMIT)) {
       throw new RangeError(
         `Input block (${bytes.length} B) exceeds maximum allowed ` +

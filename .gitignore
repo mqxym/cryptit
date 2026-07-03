@@ -5,6 +5,7 @@ build/
 dist/bin/cryptit
 *.tmp
 scan*.md
+**/scans/*
 *.enc
 *.mp4
 local-compiled/

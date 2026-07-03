@@ -35,6 +35,8 @@ import {
   InvalidHeaderError,
   HeaderDecodeError,
   DecodingError,
+  SchemeError,
+  ConfigError,
 } from './errors/index.js';
 
 import { EngineManager, type Engine } from './engine/EngineManager.js';
@@ -137,8 +139,19 @@ export class Cryptit {
     try {
       await Cryptit.peekHeader(input);
       return true;
-    } catch {
-      return false;
+    } catch (err) {
+      // A structural mismatch means "not a Cryptit container" = false.
+      // Anything else (e.g. an unexpected internal/runtime fault) is a real
+      // problem and must surface rather than be masked as `false`.
+      if (
+        err instanceof InvalidHeaderError ||
+        err instanceof HeaderDecodeError  ||
+        err instanceof DecodingError      ||
+        err instanceof SchemeError
+      ) {
+        return false;
+      }
+      throw err;
     }
   }
 
@@ -313,10 +326,10 @@ export class Cryptit {
       } else {
         size = Number(rawSize);
         if (!Number.isInteger(size) || size < 1) {
-          throw new Error(`Invalid chunkSize: ${rawSize}. Must be a positive integer.`);
+          throw new ConfigError(`Invalid chunkSize: ${rawSize}. Must be a positive integer.`);
         }
         if (size > MAX_ALLOWED_CHUNK_SIZE) {
-          throw new RangeError(`chunkSize cannot exceed ${MAX_ALLOWED_CHUNK_SIZE} bytes.`);
+          throw new ConfigError(`chunkSize cannot exceed ${MAX_ALLOWED_CHUNK_SIZE} bytes.`);
         }
       }
 
@@ -342,12 +355,17 @@ export class Cryptit {
   //  TEXT convenience
   // ════════════════════════════════════════════════════════════════════════
 
-    /**
-   * Encrypt plaintext and return a flexible output wrapper.
-   * @param plain - string | Uint8Array | ConvertibleInput
-   * @param pass  - passphrase (warning logged if empty)
-   * @returns ConvertibleOutput (read via .base64 / .hex / .uint8array)
-   * @throws EncryptionError on failure
+  /**
+   * Encrypt text/bytes into a self-describing container.
+   *
+   * @param plain - Plaintext as a string, `Uint8Array`, or `ConvertibleInput`.
+   *   NOTE: when a `Uint8Array` (or `ConvertibleInput`) is supplied, its backing
+   *   buffer is **zeroized in place** once encryption completes as a
+   *   defence-in-depth measure. Pass a copy (e.g. `bytes.slice()`) if you still
+   *   need the original plaintext afterwards.
+   * @param pass - Passphrase for key derivation (must not be `null`).
+   * @returns ConvertibleOutput over the container bytes (header + ciphertext).
+   * @throws EncryptionError on failure (original cause is chained).
    */
   async encryptText(
     plain: string | Uint8Array | ConvertibleInput,
@@ -397,6 +415,7 @@ export class Cryptit {
     } catch (err) {
       throw new EncryptionError(
         err instanceof Error ? err.message : String(err),
+        { cause: err },
       );
     }
   }
@@ -413,7 +432,7 @@ export class Cryptit {
     pass: string | null,
   ): Promise<ConvertibleOutput> {
     
-    if (pass === null) throw new EncryptionError("Password can't be null");
+    if (pass === null) throw new DecryptionError("Password can't be null");
  
     const secret = { value: pass };
 
@@ -481,6 +500,7 @@ export class Cryptit {
 
       throw new DecryptionError(
         'Decryption failed: wrong passphrase or corrupted ciphertext',
+        { cause: err },
       );
     }
   }
@@ -540,6 +560,7 @@ export class Cryptit {
     } catch (err) {
       throw new EncryptionError(
         err instanceof Error ? err.message : String(err),
+        { cause: err },
       );
     }
   }
@@ -556,7 +577,7 @@ export class Cryptit {
    */
   async decryptFile(file: Blob, pass: string | null): Promise<Blob> {
     
-    if (pass === null) throw new EncryptionError("Password can't be null");
+    if (pass === null) throw new DecryptionError("Password can't be null");
  
 
     const secret = { value: pass };
@@ -596,6 +617,7 @@ export class Cryptit {
       if (err instanceof DecryptionError) throw err;
       throw new DecryptionError(
         err instanceof Error ? err.message : String(err),
+        { cause: err },
       );
     }
   }
@@ -639,7 +661,7 @@ export class Cryptit {
   async createDecryptionStream(
     pass: string | null,
   ): Promise<TransformStream<Uint8Array, Uint8Array>> {
-    if (pass === null) throw new EncryptionError("Password can't be null");
+    if (pass === null) throw new DecryptionError("Password can't be null");
 
     const provider = this.provider;
 
@@ -849,6 +871,7 @@ export class Cryptit {
     } catch (err) {
       throw new KeyDerivationError(
         err instanceof Error ? err.message : String(err),
+        { cause: err },
       );
     }
   }

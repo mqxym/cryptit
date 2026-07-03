@@ -97,40 +97,49 @@ export class Magic48VerCrc8Padding implements PaddingScheme {
   public readonly maxPad = Magic48VerCrc8Padding.STRUCT_SIZE + 8 - 1;
 
   // ---------------------------------------------------------------------------
-  // Constant-time helpers (best-effort in JS/TS)
+  // Constant-time helpers (branchless; best-effort in JS/TS)
   // ---------------------------------------------------------------------------
 
-  /** Constant-time equality for single byte. */
-  private static ctEqU8(a: number, b: number): boolean {
-    const x = ((a | 0) ^ (b | 0)) & 0xff;
-    return x === 0;
+  /**
+   * Branchless "is this byte zero?" → returns 1 when `x === 0`, else 0.
+   * For x ∈ [0, 255]: `(x | -x) >>> 31` is 0 iff x === 0, so we invert it.
+   */
+  private static ctIsZeroU8(x: number): number {
+    return 1 ^ (((x | -x) >>> 31) & 1);
+  }
+
+  /** Constant-time equality for a single byte → 1 if equal, else 0 (no branch). */
+  private static ctEqU8(a: number, b: number): number {
+    return Magic48VerCrc8Padding.ctIsZeroU8((a ^ b) & 0xff);
   }
 
   /**
    * Constant-time equality for fixed-length byte arrays (no early exit).
-   * Assumes a.length === b.length.
+   * Accumulates all differences, then makes a single zero-test.
+   * Assumes a.length === b.length. Returns 1 if equal, else 0.
    */
-  private static ctEqFixedLen(a: Uint8Array, b: Uint8Array): boolean {
+  private static ctEqFixedLen(a: Uint8Array, b: Uint8Array): number {
     let diff = 0;
     const len = a.length;
     for (let i = 0; i < len; i++) {
       diff |= (a[i] ^ b[i]);
     }
-    return diff === 0;
+    return Magic48VerCrc8Padding.ctIsZeroU8(diff & 0xff);
   }
 
   // ---------------------------------------------------------------------------
   // CRC-8-ATM over given buffer
   // ---------------------------------------------------------------------------
 
-  /** Compute CRC-8-ATM (poly 0x07) over `buf`. */
+  /** Compute CRC-8-ATM (poly 0x07) over `buf` (branchless inner loop). */
   private crc8(buf: Uint8Array): number {
     let crc = 0x00;
     for (let i = 0; i < buf.length; i++) {
       crc ^= buf[i] & 0xff;
       for (let b = 0; b < 8; b++) {
-        crc = (crc & 0x80) ? ((crc << 1) ^ Magic48VerCrc8Padding.CRC8_POLY) : (crc << 1);
-        crc &= 0xff;
+        // mask = 0xFF when the top bit is set, else 0x00 — no data-dependent branch.
+        const mask = -((crc >> 7) & 1);
+        crc = ((crc << 1) ^ (Magic48VerCrc8Padding.CRC8_POLY & mask)) & 0xff;
       }
     }
     return crc & 0xff;
@@ -238,42 +247,45 @@ export class Magic48VerCrc8Padding implements PaddingScheme {
    */
   public tryUnpad(padded: Uint8Array): { used: boolean; plain: Uint8Array } {
     const s = Magic48VerCrc8Padding.STRUCT_SIZE;
-    const fail = () => ({ used: false, plain: padded });
 
-    // Need at least the 8-byte structure to even attempt parsing.
-    if (padded.length < s) return fail();
+    // Too short to hold a trailer at all → definitely no padding.
+    // (Length is public, so this single structural branch is not a side channel.)
+    if (padded.length < s) return { used: false, plain: padded };
 
-    const end = padded.length;
-    const crc = padded[end - 1] & 0xff;
+    const end     = padded.length;
+    const crc     = padded[end - 1] & 0xff;
     const lenByte = padded[end - 2] & 0xff;
     const verByte = padded[end - 3] & 0xff;
 
-    // Bounds & range checks (public values; safe to branch on).
-    // Minimal structure; cap by available bytes. (No maxPad check: align unknown here.)
-    if (lenByte < s || lenByte > padded.length) return fail();
-
-    // MAGIC40 is 5 bytes starting at end - STRUCT_SIZE
+    // MAGIC40 sits at a FIXED offset from the end (independent of lenByte), so all
+    // trailer reads below are at constant positions regardless of the LEN value.
     const magicStart = end - s;
-    const magic = padded.subarray(magicStart, magicStart + 5);
+    const magic      = padded.subarray(magicStart, magicStart + 5);
 
-    // Constant-time MAGIC compare.
-    const magicOk = Magic48VerCrc8Padding.ctEqFixedLen(magic, Magic48VerCrc8Padding.MAGIC40);
-    if (!magicOk) return fail();
+    // Accumulate every check into a single 0/1 mask with no early exits, so the
+    // comparison cost does not depend on *which* field first mismatches.
+    let ok = 1;
+    ok &= Magic48VerCrc8Padding.ctEqFixedLen(magic, Magic48VerCrc8Padding.MAGIC40);
+    ok &= Magic48VerCrc8Padding.ctEqU8(verByte, Magic48VerCrc8Padding.VERSION & 0xff);
 
-    // Constant-time VERSION compare.
-    if (!Magic48VerCrc8Padding.ctEqU8(verByte, Magic48VerCrc8Padding.VERSION & 0xff)) return fail();
-
-    // CRC8 over MAGIC40 || VER || LEN  (7-byte input)
+    // CRC8 over MAGIC40 || VER || LEN  (7-byte input) — always computed.
     const crcInput = new Uint8Array(7);
     crcInput.set(Magic48VerCrc8Padding.MAGIC40, 0);
     crcInput[5] = verByte;
     crcInput[6] = lenByte;
-    const expected = this.crc8(crcInput);
+    ok &= Magic48VerCrc8Padding.ctEqU8(this.crc8(crcInput), crc);
 
-    // Constant-time single-byte compare for CRC.
-    if (!Magic48VerCrc8Padding.ctEqU8(expected, crc)) return fail();
+    // LEN range validity (public structural bounds: s ≤ lenByte ≤ length).
+    ok &= (lenByte >= s ? 1 : 0);
+    ok &= (lenByte <= padded.length ? 1 : 0);
 
-    // Success: strip trailer
-    return { used: true, plain: padded.subarray(0, end - lenByte) };
+    // Clamp the strip length so an invalid LEN can never index out of bounds;
+    // when `ok` is true, `lenByte` is already guaranteed valid.
+    const safeLen = ok === 1 ? lenByte : s;
+
+    // Single decision point — return the stripped buffer only when every check held.
+    return ok === 1
+      ? { used: true,  plain: padded.subarray(0, end - safeLen) }
+      : { used: false, plain: padded };
   }
 }

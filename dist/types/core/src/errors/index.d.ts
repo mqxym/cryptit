@@ -1,5 +1,5 @@
 export declare class CryptitError extends Error {
-    constructor(message: string);
+    constructor(message: string, options?: ErrorOptions);
 }
 export declare class InvalidHeaderError extends CryptitError {
 }
@@ -18,4 +18,6 @@ export declare class EncryptionError extends CryptitError {
 export declare class DecryptionError extends CryptitError {
 }
 export declare class FilesystemError extends CryptitError {
+}
+export declare class ConfigError extends CryptitError {
 }

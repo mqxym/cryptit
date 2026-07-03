@@ -36,6 +36,13 @@ describe('cryptit (CLI)', () => {
     expect(dec.stdout).toBe('hello');
   });
 
+  it('round-trips text containing unicode, quotes and shell metacharacters', async () => {
+    const tricky = 'héllo 🌍 "quotes" $pecial &| chars';
+    const enc = await run(['encrypt-text', tricky, '--pass', 'pw']);
+    const dec = await run(['decrypt-text', enc.stdout.trim(), '--pass', 'pw']);
+    expect(dec.stdout).toBe(tricky);
+  });
+
   it('decode detects header meta-data', async () => {
       const { stdout: cipher } = await run(['encrypt-text', 'a', '--pass', 'p']);
 
