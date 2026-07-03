@@ -89,14 +89,20 @@ export declare class Magic48VerCrc8Padding implements PaddingScheme {
      * (Internally, we derive the feasible k from the provided `align` at runtime.)
      */
     readonly maxPad: number;
-    /** Constant-time equality for single byte. */
+    /**
+     * Branchless "is this byte zero?" → returns 1 when `x === 0`, else 0.
+     * For x ∈ [0, 255]: `(x | -x) >>> 31` is 0 iff x === 0, so we invert it.
+     */
+    private static ctIsZeroU8;
+    /** Constant-time equality for a single byte → 1 if equal, else 0 (no branch). */
     private static ctEqU8;
     /**
      * Constant-time equality for fixed-length byte arrays (no early exit).
-     * Assumes a.length === b.length.
+     * Accumulates all differences, then makes a single zero-test.
+     * Assumes a.length === b.length. Returns 1 if equal, else 0.
      */
     private static ctEqFixedLen;
-    /** Compute CRC-8-ATM (poly 0x07) over `buf`. */
+    /** Compute CRC-8-ATM (poly 0x07) over `buf` (branchless inner loop). */
     private crc8;
     /**
      * Compute trailer length k such that:

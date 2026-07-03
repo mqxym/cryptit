@@ -109,4 +109,23 @@ describe('Magic48VerCrc8Padding', () => {
     const res2 = padder.tryUnpad(mutated2);
     expect(res2.used).toBe(false);
   });
+
+  it('still unpads when a random-fill byte is corrupted (CRC covers only the struct)', () => {
+    const padder = new Magic48VerCrc8Padding();
+    const rng = deterministicRng();
+    // plain length 1 with align 16 → k = 15, so rndLen = k - 8 = 7 random-fill bytes exist.
+    const plain = Uint8Array.of(0xAB);
+    const padded = padder.pad(plain, rng, 16);
+    const k = padded[padded.length - 2];
+    expect(k).toBe(15);
+
+    // Corrupt a byte inside the random-fill region (right after the plaintext),
+    // which is NOT part of MAGIC40||VER||LEN||CRC8 and therefore not CRC-guarded.
+    const corrupted = padded.slice();
+    corrupted[plain.length] ^= 0xff;
+
+    const { used, plain: unpadded } = padder.tryUnpad(corrupted);
+    expect(used).toBe(true);
+    expect(new Uint8Array(unpadded)).toEqual(plain);
+  });
 });

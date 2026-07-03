@@ -37,6 +37,6 @@ export function decodeHeader(
 
     return { scheme, difficulty, saltStrength, salt, headerLen };
   } catch (err) {
-    throw new HeaderDecodeError(err instanceof Error ? err.message : String(err));
+    throw new HeaderDecodeError(err instanceof Error ? err.message : String(err), { cause: err });
   }
 }

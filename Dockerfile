@@ -1,4 +1,4 @@
-FROM oven/bun:1.3.12-alpine AS builder
+FROM oven/bun:1.3.14-alpine AS builder
 
 WORKDIR /app
 
@@ -12,7 +12,7 @@ COPY packages/ ./packages
 RUN bun build --compile --outfile=/app/cryptit packages/node-runtime/src/cli.ts
 
 
-FROM alpine:3.23 AS runner
+FROM alpine:3.24 AS runner
 
 RUN apk add --no-cache ca-certificates libstdc++ libgcc
 

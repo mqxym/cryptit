@@ -39,9 +39,8 @@ export function base64Encode(...chunks: Uint8Array[]): string {
     let binary = '';
     for (let i = 0; i < data.length; i++) binary += String.fromCharCode(data[i]);
     return btoa(binary);
-  } catch {
-    const msg = "Base64 Encoding Error";
-    throw new EncodingError(msg);
+  } catch (err) {
+    throw new EncodingError('Base64 Encoding Error', { cause: err });
   }
   
 }
@@ -61,9 +60,10 @@ export function base64Decode(b64: string): Uint8Array {
     const out = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
     return out;
-  } catch {
+  } catch (err) {
       throw new DecodingError(
       `Invalid Base64: length=${b64.length}, content='${b64.slice(0,12)}…'`,
+      { cause: err },
     );
   }  
 }

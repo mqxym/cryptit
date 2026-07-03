@@ -39,3 +39,30 @@ describe('cryptit CLI - file round-trip', () => {
     expect(back.equals(orig)).toBe(true);
   });
 });
+
+describe('cryptit CLI - special-character filenames', () => {
+  let dir: string;
+
+  beforeAll(async () => {
+    dir = await fs.mkdtemp(join(__dirname, '..', 'cryptit-'));
+  });
+
+  afterAll(() => fs.rm(dir, { recursive: true, force: true }));
+
+  it('round-trips a file whose name contains spaces and unicode', async () => {
+    const src = join(dir, 'pläin file (1).bin');
+    const enc = join(dir, 'encrypted out.bin');
+    const dec = join(dir, 'décodé résult.bin');
+    const data = randomBytes(4 * 1024);
+
+    await fs.writeFile(src, data);
+    await fs.writeFile(enc, Buffer.alloc(0));
+    await fs.writeFile(dec, Buffer.alloc(0));
+
+    await run(['encrypt', src, '--pass', 'pw', '--out', enc]);
+    await run(['decrypt', enc, '--pass', 'pw', '--out', dec]);
+
+    const back = await fs.readFile(dec);
+    expect(back.equals(data)).toBe(true);
+  });
+});

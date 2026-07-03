@@ -142,12 +142,17 @@ export declare class Cryptit {
     /** Get the current logger verbosity setting. */
     getVerbose(): Verbosity;
     /**
-   * Encrypt plaintext and return a flexible output wrapper.
-   * @param plain - string | Uint8Array | ConvertibleInput
-   * @param pass  - passphrase (warning logged if empty)
-   * @returns ConvertibleOutput (read via .base64 / .hex / .uint8array)
-   * @throws EncryptionError on failure
-   */
+     * Encrypt text/bytes into a self-describing container.
+     *
+     * @param plain - Plaintext as a string, `Uint8Array`, or `ConvertibleInput`.
+     *   NOTE: when a `Uint8Array` (or `ConvertibleInput`) is supplied, its backing
+     *   buffer is **zeroized in place** once encryption completes as a
+     *   defence-in-depth measure. Pass a copy (e.g. `bytes.slice()`) if you still
+     *   need the original plaintext afterwards.
+     * @param pass - Passphrase for key derivation (must not be `null`).
+     * @returns ConvertibleOutput over the container bytes (header + ciphertext).
+     * @throws EncryptionError on failure (original cause is chained).
+     */
     encryptText(plain: string | Uint8Array | ConvertibleInput, pass: string | null): Promise<ConvertibleOutput>;
     /**
      * Decrypt a ciphertext container and return a flexible output wrapper.
