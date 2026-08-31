@@ -1,5 +1,5 @@
 // packages/core/src/stream/StreamProcessor.ts
-import { EncryptTransform } from './EncryptTransform.js';
+import { EncryptTransform, type EncryptTransformOptions } from './EncryptTransform.js';
 import { DecryptTransform } from './DecryptTransform.js';
 import type { PaddingAwareEncryptionAlgorithm } from '../types/index.js';
 import { collectStream } from '../util/stream.js';
@@ -10,8 +10,8 @@ export class StreamProcessor {
     private readonly chunkSize = 512 * 1024,
   ) {}
 
-  encryptionStream(): TransformStream<Uint8Array, Uint8Array> {
-    const enc = new EncryptTransform(this.engine, this.chunkSize)
+  encryptionStream(options: EncryptTransformOptions = {}): TransformStream<Uint8Array, Uint8Array> {
+    const enc = new EncryptTransform(this.engine, this.chunkSize, options)
                   .toTransformStream();
     return {
       writable: enc.writable,

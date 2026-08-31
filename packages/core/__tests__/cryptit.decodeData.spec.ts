@@ -34,9 +34,9 @@ import { encodeHeader } from '../src/header/encoder.js';
 import { InvalidHeaderError } from '../src/errors/index.js';
 
 describe('Cryptit.decodeData - empty & too-short payloads', () => {
-  it('returns zero-chunk stats for header-only containers', async () => {
+  it('returns zero-chunk stats for authenticated empty containers', async () => {
     const crypt = new Cryptit(nodeProvider, { difficulty: 'low', saltStrength: 'low' });
-    const emptyBlob = await crypt.encryptFile(new Blob([]), 'pw'); // header-only
+    const emptyBlob = await crypt.encryptFile(new Blob([]), 'pw');
     const info = await Cryptit.decodeData(emptyBlob);
     expect(info.isChunked).toBe(true);
     if (info.isChunked) {

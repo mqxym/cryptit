@@ -62,3 +62,14 @@ describe('Cryptit configuration guards', () => {
     expect(plain.text).toBe('legacy');
   });
 });
+
+describe('Cryptit decryption resource policy', () => {
+  it('rejects ciphertext above the configured KDF ceiling', async () => {
+    const writer = new Cryptit(nodeProvider, { difficulty: 'middle' });
+    const encrypted = await writer.encryptText('policy check', 'pw');
+    const reader = new Cryptit(nodeProvider, { maxDecryptionDifficulty: 'low' });
+
+    await expect(reader.decryptText(encrypted.uint8array, 'pw'))
+      .rejects.toThrow(/exceeds configured maximum/);
+  });
+});

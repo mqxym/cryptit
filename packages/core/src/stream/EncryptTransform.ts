@@ -1,7 +1,19 @@
 // packages/core/src/stream/EncryptTransform.ts
 import type { EncryptionAlgorithm } from '../types/index.js';
 import { ensureUint8Array } from '../util/convert.js';
-import { encodeFrameLen, FRAME_HEADER_BYTES } from '../util/frame.js';
+import {
+  buildStreamRecordAAD,
+  encodeFrameLen,
+  encodeStreamRecord,
+  FRAME_HEADER_BYTES,
+  MAX_STREAM_WRITE_SIZE,
+  type StreamFormat,
+} from '../util/frame.js';
+
+export interface EncryptTransformOptions {
+  format?: StreamFormat;
+  header?: Uint8Array;
+}
 
 /**
  * TransformStream that:
@@ -17,19 +29,36 @@ import { encodeFrameLen, FRAME_HEADER_BYTES } from '../util/frame.js';
  */
 export class EncryptTransform {
   private buffer = new Uint8Array(0);
+  private recordIndex = 0n;
+  private readonly format: StreamFormat;
+  private readonly header: Uint8Array;
 
   constructor(
     private readonly engine: EncryptionAlgorithm,
     private readonly chunkSize = 512 * 1024,
-  ) {}
+    options: EncryptTransformOptions = {},
+  ) {
+    this.format = options.format ?? 'legacy';
+    this.header = options.header?.slice() ?? new Uint8Array(0);
+    if (this.format === 'authenticated-v1' && this.header.length === 0) {
+      throw new Error('Authenticated stream encryption requires the encoded header');
+    }
+  }
 
   toTransformStream(): TransformStream<Uint8Array | ArrayBuffer | Blob, Uint8Array> {
     return new TransformStream({
       transform: async (chunk, ctl) => {
-        await this.transform(
-          await ensureUint8Array(chunk),
-          ctl,
-        );
+        try {
+          await this.transform(
+            await ensureUint8Array(chunk),
+            ctl,
+          );
+        } catch (err) {
+          this.buffer.fill(0);
+          this.buffer = new Uint8Array(0);
+          this.engine.zeroKey();
+          throw err;
+        }
       },
       flush: async ctl => this.flush(ctl),
     });
@@ -39,13 +68,12 @@ export class EncryptTransform {
     bytes: Uint8Array,
     ctl: TransformStreamDefaultController<Uint8Array>,
   ) {
-    const HARD_LIMIT = 64 * 1024 * 1024; // 64 MiB safety
     // Per-write cap: reject anything larger than min(chunkSize*4, 64 MiB) so a
     // single oversized write cannot blow up peak memory (see class docs).
-    if (bytes.length > Math.min(this.chunkSize * 4, HARD_LIMIT)) {
+    if (bytes.length > Math.min(this.chunkSize * 4, MAX_STREAM_WRITE_SIZE)) {
       throw new RangeError(
         `Input block (${bytes.length} B) exceeds maximum allowed ` +
-        `${Math.min(this.chunkSize * 4, HARD_LIMIT)} B`,
+        `${Math.min(this.chunkSize * 4, MAX_STREAM_WRITE_SIZE)} B`,
       );
     }
     const combined = new Uint8Array(this.buffer.length + bytes.length);
@@ -57,11 +85,7 @@ export class EncryptTransform {
       const block = combined.slice(offset, offset + this.chunkSize);
       offset += this.chunkSize;
 
-      const encrypted = await this.engine.encryptChunk(block);
-      const out = new Uint8Array(FRAME_HEADER_BYTES + encrypted.length);
-      out.set(encodeFrameLen(encrypted.length));
-      out.set(encrypted, FRAME_HEADER_BYTES);
-      ctl.enqueue(out);
+      await this.emitRecord(block, false, ctl);
     
     }
 
@@ -69,17 +93,48 @@ export class EncryptTransform {
   }
 
   private async flush(ctl: TransformStreamDefaultController<Uint8Array>) {
-    if (!this.buffer.length) return;
-    const encrypted = await this.engine.encryptChunk(this.buffer);
+    try {
+      if (this.buffer.length) await this.emitRecord(this.buffer, false, ctl);
+      if (this.format === 'authenticated-v1') {
+        await this.emitRecord(new Uint8Array(0), true, ctl);
+      }
+    } finally {
+      this.buffer.fill(0);
+      this.buffer = new Uint8Array(0);
+      this.engine.zeroKey();
+    }
+  }
 
-    const out = new Uint8Array(FRAME_HEADER_BYTES + encrypted.length);
-    out.set(encodeFrameLen(encrypted.length));
-    out.set(encrypted, FRAME_HEADER_BYTES);
-    ctl.enqueue(out);
-    
-    this.buffer = new Uint8Array(0);
+  private async emitRecord(
+    plain: Uint8Array,
+    terminal: boolean,
+    ctl: TransformStreamDefaultController<Uint8Array>,
+  ): Promise<void> {
+    let expectedLength: number | null = null;
+    let frame: Uint8Array;
 
-    this.engine.zeroKey();
+    if (this.format === 'authenticated-v1') {
+      expectedLength = this.engine.IV_LENGTH + plain.length + this.engine.TAG_LENGTH;
+      frame = encodeStreamRecord(expectedLength, terminal);
+      const word = new DataView(frame.buffer, frame.byteOffset, frame.byteLength)
+        .getUint32(0, false);
+      this.engine.setAAD(buildStreamRecordAAD(this.header, this.recordIndex, { terminal, word }));
+    } else {
+      frame = new Uint8Array(0);
+    }
+
+    const encrypted = await this.engine.encryptChunk(plain);
+    if (expectedLength !== null && encrypted.length !== expectedLength) {
+      encrypted.fill(0);
+      throw new Error(`Cipher produced ${encrypted.length} bytes; expected ${expectedLength}`);
+    }
+    if (this.format === 'legacy') frame = encodeFrameLen(encrypted.length);
+
+    const output = new Uint8Array(FRAME_HEADER_BYTES + encrypted.length);
+    output.set(frame, 0);
+    output.set(encrypted, FRAME_HEADER_BYTES);
+    ctl.enqueue(output);
+    this.recordIndex++;
   }
 
 }

@@ -1,5 +1,9 @@
 // packages/core/src/header/decoder.ts
-import { HEADER_START_BYTE } from './constants.js';
+import {
+  HEADER_RESERVED_MASK,
+  HEADER_START_BYTE,
+  HEADER_STREAM_AUTH_BIT,
+} from './constants.js';
 import { SchemeRegistry }   from '../config/SchemeRegistry.js';
 import { InvalidHeaderError, HeaderDecodeError } from '../errors/index.js';
 import { EncryptionAlgorithm } from '../types/index.js';
@@ -19,10 +23,19 @@ export function decodeHeader(
 
   try {
     const info          = buf[1];
+    if ((info & HEADER_RESERVED_MASK) !== 0) {
+      throw new InvalidHeaderError('Unsupported header flags.');
+    }
     const scheme        = info >> 5;
     const saltStrength: 'low' | 'high' = ((info >> 2) & 1) ? 'high' : 'low';
     const diffCode      = info & 0b11;
+    if (diffCode === 3) {
+      throw new InvalidHeaderError('Unsupported difficulty code.');
+    }
     const difficulty    = (['low', 'middle', 'high'] as const)[diffCode];
+    const streamFormat: 'authenticated-v1' | 'legacy' = (info & HEADER_STREAM_AUTH_BIT) !== 0
+      ? 'authenticated-v1'
+      : 'legacy';
     const saltLen       = SchemeRegistry.get(scheme).saltLengths[saltStrength];
     const headerLen     = 2 + saltLen;
 
@@ -35,7 +48,7 @@ export function decodeHeader(
 
     const salt          = buf.slice(2, 2 + saltLen);
 
-    return { scheme, difficulty, saltStrength, salt, headerLen };
+    return { scheme, difficulty, saltStrength, salt, headerLen, streamFormat };
   } catch (err) {
     throw new HeaderDecodeError(err instanceof Error ? err.message : String(err), { cause: err });
   }

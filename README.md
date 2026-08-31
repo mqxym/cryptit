@@ -207,6 +207,7 @@ echo "AQVWgYDH/rkR6Ymxv1W9NzFWTsvTTXsnEaLHPx+NlATmuwcqea5RlljX1ly16Px716I2yGX/Xs
 | Flag                      | Default | Description          |
 | ------------------------- | ------- | -------------------- |
 | `-p, --pass <pw>`         | prompt  | passphrase           |
+| `--pass-file <file>`      | none    | read passphrase from a file (max 64 KiB) |
 | `-d, --difficulty <l>`    | middle  | Argon2 preset        |
 | `-S, --scheme <0-1>.`     | 0.      | Scheme preset        |
 | `-s, --salt-strength <l>` | high    | 12 B vs 16 B salt    |
@@ -216,7 +217,8 @@ echo "AQVWgYDH/rkR6Ymxv1W9NzFWTsvTTXsnEaLHPx+NlATmuwcqea5RlljX1ly16Px716I2yGX/Xs
 Exit codes: **0** success · **1** any failure (invalid header, auth, I/O …)
 
 > [!NOTE]
-> Use the prompt password feature where ever possible, to not leak your password via history.
+> Prefer the prompt or `--pass-file`. Values passed through `--pass` can be visible
+> in shell history and process listings before the CLI can redact its argument array.
 
 ---
 
@@ -224,6 +226,11 @@ Exit codes: **0** success · **1** any failure (invalid header, auth, I/O …)
 
 * Header: `0x01 | infoByte | salt`
 * Decryptors pick the engine by the header’s scheme ⇒ **one CLI handles all registered schemes**.
+* Header info bit 3 marks an `authenticated-v1` file/stream container.
+* Authenticated streams bind every record to its zero-based ordinal, record type,
+  encoded frame word, and exact header through AEAD additional data.
+* Every authenticated stream ends with an authenticated empty terminal record.
+  Missing, duplicated, reordered, or post-terminal records are rejected.
 
 ### Additional Authenticated Data
 
@@ -231,6 +238,17 @@ Exit codes: **0** success · **1** any failure (invalid header, auth, I/O …)
 * Since version 2.2.0: `encryptText()` uses 8-bit padding before AEAD, which is also tagged in AAD.
 
 ### Compatibility
+
+* New file and stream writes use `authenticated-v1` framing by default. Current
+  readers continue to decrypt all unmarked legacy containers.
+* Older Cryptit releases cannot read authenticated streams. During a migration,
+  create a writer with `{ streamFormat: "legacy" }` when old readers must consume
+  newly encrypted files. Legacy framing does not authenticate record order or a
+  terminal record and should only be used for that compatibility requirement.
+* `Cryptit.decodeData()` reports `format` and `authenticated` for chunked payloads.
+* Services accepting untrusted ciphertext can set
+  `{ maxDecryptionDifficulty: "low" | "middle" | "high" }` to reject a more
+  expensive Argon2 profile before key derivation. The compatible default is `high`.
 
 * To decrypt data from versions prior to 1.0.0, there is a temporary solution:
 
@@ -258,27 +276,36 @@ bun install && bun run build && bun test
 
 * AES-GCM 256 / 12-byte IV / 128-bit tag
 * XChaCha20Poly1305 / 24-byte IV / 128-bit tag
-* Argon2-id presets (low / middle / high)
+* Argon2-id presets (low / middle / high); configured memory values are in KiB,
+  giving the current schemes 64-96 MiB memory costs
 * Salts generated per-ciphertext; never reused
+* File/stream records are sequence-authenticated and require an authenticated end marker
+* Mutable cipher state is isolated per operation and keys are cleared on completion or failure
+* CLI file output is written to a restrictive same-directory temporary file and
+  renamed into place only after the complete operation succeeds
+
+For stdout decryption, consumers must treat emitted bytes as provisional until the
+command exits successfully. A terminal authentication failure cannot retract bytes
+already consumed from a pipe.
 
 ---
 
-## CLI Benchmarks (Bun Engine, MacOS, M3 Pro Chip)
+## CLI Benchmarks (Cryptit 2.4.0, Bun 1.4.0, macOS, M3 Pro)
 
 > **TL;DR**
-> • **Scheme 0** (AES‑GCM/SubtleCrypto + XChaCha20‑Poly1305) is much faster for streaming: **peak ~1,810 MiB/s** (stdin→stdout, 256 MiB, *middle*).
-> • **Scheme 1** (XChaCha20‑Poly1305) peaks **~170 MiB/s**.
+> • **Scheme 0** (AES‑GCM/SubtleCrypto) is much faster for streaming: **peak ~1,174 MiB/s** (decrypt stdin→stdout, 1 GiB, *high*).
+> • **Scheme 1** (XChaCha20‑Poly1305) peaks **~187 MiB/s**.
 > • KDF cost is now measured separately and **not** included in “stream‑only” throughput below.
 
 ---
 
-#### KDF Baseline (avg of 3, encrypt‑text 16 B payload)
+#### KDF Baseline (avg of 10, encrypt‑text 16 B payload)
 
 | Difficulty | KDF avg (Scheme 0) | KDF avg (Scheme 1) |
 | :--------: | -----------------: | -----------------: |
-|     low    |         174.29 ms  |         167.05 ms  |
-|   middle   |         540.41 ms  |         442.74 ms  |
-|    high    |        1013.10 ms  |         825.44 ms  |
+|     low    |         187.79 ms  |         186.39 ms  |
+|   middle   |         569.71 ms  |         490.57 ms  |
+|    high    |        1079.33 ms  |         881.34 ms  |
 
 <details>
 <summary><strong>Stream‑only Throughput (KDF‑subtracted) — Scheme 0</strong></summary>
@@ -287,9 +314,9 @@ bun install && bun run build && bun test
 
 |    Size   |  Difficulty  |  enc f→f  |  dec f→out  |   enc in→out  |  dec in→out  |
 | :-------: | :----------: | --------: | ----------: | ------------: | -----------: |
-|  256 MiB  |    low       |   868.33  |     910.05  |      1709.13  |     1519.16  |
-|  256 MiB  |    middle    |   995.48  |     910.46  |  **1810.27**  |     1585.49  |
-|  256 MiB  |    high      |   899.43  |     866.88  |      1658.29  |     1409.89  |
+|    1 GiB  |    low       |   605.39  |     581.84  |      1015.35  |     1068.40  |
+|    1 GiB  |    middle    |   577.80  |     577.68  |      1017.11  |     1053.58  |
+|    1 GiB  |    high      |   654.19  |     652.13  |      1103.43  |  **1174.03**  |
 
 </details>
 
@@ -300,9 +327,9 @@ bun install && bun run build && bun test
 
 |    Size   |  Difficulty  |  enc f→f  |  dec f→out  |  enc in→out  |  dec in→out  |
 | :-------: | :----------: | --------: | ----------: | -----------: | -----------: |
-|  256 MiB  |    low       |   149.33  |     153.01  |      167.36  |      164.99  |
-|  256 MiB  |    middle    |   154.23  |     154.72  |  **169.55**  |      162.91  |
-|  256 MiB  |    high      |   149.83  |     151.26  |      157.55  |      163.05  |
+|    1 GiB  |    low       |   164.26  |     157.17  |      186.09  |      181.77  |
+|    1 GiB  |    middle    |   165.23  |     156.97  |  **186.63**  |      181.86  |
+|    1 GiB  |    high      |   165.53  |     157.20  |      183.02  |      181.59  |
 
 </details>
 
@@ -313,9 +340,9 @@ bun install && bun run build && bun test
 
 |    Size   |  Difficulty  |           enc f→f  |         dec f→out  |        enc in→out  |        dec in→out  |  decode file (ms)  |  decode stdin (ms)  |
 | :-------: | :----------: | -----------------: | -----------------: | -----------------: | -----------------: | -----------------: | ------------------: |
-|  256 MiB  |    low       |   469 ms / 0.47 s  |   456 ms / 0.46 s  |   324 ms / 0.32 s  |   343 ms / 0.34 s  |                45  |                153  |
-|  256 MiB  |    middle    |   798 ms / 0.80 s  |   822 ms / 0.82 s  |   682 ms / 0.68 s  |   702 ms / 0.70 s  |                46  |                190  |
-|  256 MiB  |    high      |  1298 ms / 1.30 s  |  1308 ms / 1.31 s  |  1167 ms / 1.17 s  |  1195 ms / 1.19 s  |                45  |                178  |
+|    1 GiB  |    low       |  1880 ms / 1.88 s  |  1948 ms / 1.95 s  |  1196 ms / 1.20 s  |  1146 ms / 1.15 s  |                72  |                570  |
+|    1 GiB  |    middle    |  2344 ms / 2.34 s  |  2343 ms / 2.34 s  |  1577 ms / 1.58 s  |  1547 ms / 1.55 s  |                71  |                539  |
+|    1 GiB  |    high      |  2645 ms / 2.65 s  |  2650 ms / 2.65 s  |  2008 ms / 2.01 s  |  1952 ms / 1.95 s  |                64  |                509  |
 
 </details>
 
@@ -326,9 +353,9 @@ bun install && bun run build && bun test
 
 |    Size   |  Difficulty  |           enc f→f  |         dec f→out  |        enc in→out  |        dec in→out  |  decode file (ms)  |  decode stdin (ms)  |
 | :-------: | :----------: | -----------------: | -----------------: | -----------------: | -----------------: | -----------------: | ------------------: |
-|  256 MiB  |    low       |  1881 ms / 1.88 s  |  1840 ms / 1.84 s  |  1697 ms / 1.70 s  |  1719 ms / 1.72 s  |                48  |                133  |
-|  256 MiB  |    middle    |  2103 ms / 2.10 s  |  2097 ms / 2.10 s  |  1953 ms / 1.95 s  |  2014 ms / 2.01 s  |                48  |                180  |
-|  256 MiB  |    high      |  2534 ms / 2.53 s  |  2518 ms / 2.52 s  |  2450 ms / 2.45 s  |  2396 ms / 2.40 s  |                49  |                190  |
+|    1 GiB  |    low       |  6421 ms / 6.42 s  |  6703 ms / 6.70 s  |  5689 ms / 5.69 s  |  5820 ms / 5.82 s  |                64  |                489  |
+|    1 GiB  |    middle    |  6688 ms / 6.69 s  |  7014 ms / 7.01 s  |  5977 ms / 5.98 s  |  6122 ms / 6.12 s  |                64  |                512  |
+|    1 GiB  |    high      |  7067 ms / 7.07 s  |  7396 ms / 7.40 s  |  6483 ms / 6.48 s  |  6521 ms / 6.52 s  |                63  |                514  |
 
 </details>
 
@@ -336,9 +363,9 @@ bun install && bun run build && bun test
 `enc f→f` = encrypt file→file • `dec f→out` = decrypt file→stdout • `enc in→out` = encrypt stdin→stdout • `dec in→out` = decrypt stdin→stdout.
 
 **Method notes**
-• CLI: `bun run cli:run`  • Difficulties: low/middle/high  • Size: 256 MiB  • Repeats: 1
-• **KDF repeats = 3**, payload = 16 bytes. “Stream‑only” removes the measured KDF baseline for the respective difficulty; wall‑clock shows full end‑to‑end time.
-
+• CLI: `bun run cli:run`  • Difficulties: low/middle/high  • Size: 1 GiB  • Repeats: 5
+• **KDF repeats = 10**, payload = 16 bytes. “Stream‑only” removes the measured KDF baseline for the respective difficulty; wall‑clock shows full end‑to‑end time.
+• Values are arithmetic means. Across the 24 five-run throughput series, 22 had a sample coefficient of variation below 4.1%; the maximum was 8.1%.
 
 ---
 

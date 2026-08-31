@@ -1,6 +1,7 @@
 // packages/core/src/util/ByteSource.ts
 import { base64Decode } from './bytes.js';
 import { assertSliceBounds } from './range.js';
+import { DecodingError } from '../errors/index.js';
 
 /**
  * Unified, zero -copy accessor for Blob | Uint8Array | Base64 -encoded string.
@@ -90,8 +91,22 @@ export class FileByteSource implements RandomAccessSource {
 
   async read(offset: number, len: number): Promise<Uint8Array> {
     assertSliceBounds(this.length, offset, len);
-    const buf = Buffer.allocUnsafe(len);
-    await this.fd.read(buf, 0, len, offset);
+    const buf = Buffer.alloc(len);
+    let totalRead = 0;
+    while (totalRead < len) {
+      const { bytesRead } = await this.fd.read(
+        buf,
+        totalRead,
+        len - totalRead,
+        offset + totalRead,
+      );
+      if (bytesRead === 0) {
+        throw new DecodingError(
+          `File changed while reading: expected ${len} bytes, received ${totalRead}`,
+        );
+      }
+      totalRead += bytesRead;
+    }
     return new Uint8Array(buf);
   }
 

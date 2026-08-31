@@ -4,6 +4,7 @@ import { Difficulty, SaltStrength } from './config/defaults.js';
 import { ConvertibleInput, ConvertibleOutput } from './util/Convertible.js';
 import { type Verbosity } from './util/logger.js';
 import { RandomAccessSource } from './util/ByteSource.js';
+import { type StreamFormat } from './util/frame.js';
 /**
  * Result of creating an encryption stream: header and paired streams.
  */
@@ -27,6 +28,10 @@ export interface CryptitOptions {
     difficulty?: Difficulty;
     /** Chunk size for streaming operations; defaults to descriptor's default */
     chunkSize?: number;
+    /** Framing used for new file/stream ciphertext; defaults to authenticated-v1 */
+    streamFormat?: StreamFormat;
+    /** Highest KDF difficulty accepted from ciphertext headers; defaults to high */
+    maxDecryptionDifficulty?: Difficulty;
     /** Enable legacy file and text decryption version < 1.0.0 */
     acceptUnauthenticatedHeader?: boolean;
     /** Verbosity level 0-4 for logging (0 = errors only) */
@@ -36,6 +41,8 @@ export interface CryptitOptions {
 }
 export type DecodeDataResult = {
     isChunked: true;
+    format: StreamFormat;
+    authenticated: boolean;
     chunks: {
         chunkSize: number;
         count: number;
@@ -61,6 +68,8 @@ export declare class Cryptit {
     private kdf;
     private chunkSize;
     private stream;
+    private streamFormat;
+    private maxDecryptionDifficulty;
     private acceptUnauthenticatedHeader;
     private difficulty;
     private saltStrength;
@@ -212,6 +221,7 @@ export declare class Cryptit {
     private deriveKey;
     /** Generate a secure random salt according to configured length. */
     private genSalt;
+    private assertDecryptionDifficulty;
     /**
      * Read minimal bytes to extract and validate Cryptit header.
      * @param input - Base64 string, Uint8Array, or Blob containing header
