@@ -73,7 +73,7 @@
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.9", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.0.3", "@jridgewell/sourcemap-codec": "^1.4.10" } }, "sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ=="],
 
-    "@noble/ciphers": ["@noble/ciphers@2.2.0", "", {}, "sha512-Z6pjIZ/8IJcCGzb2S/0Px5J81yij85xASuk1teLNeg75bfT07MV3a/O2Mtn1I2se43k3lkVEcFaR10N4cgQcZA=="],
+    "@noble/ciphers": ["@noble/ciphers@2.4.0", "", {}, "sha512-AnjFn0Jv92laAkvMrghlFZq4qQCIN/4DxFV/eooqtC2YTjB7kBeLMS2T9KJX4Dn+ZVXLOwK0lSgqDtx9gvxtiw=="],
 
     "@node-rs/argon2": ["@node-rs/argon2@2.1.0", "", { "optionalDependencies": { "@node-rs/argon2-android-arm-eabi": "2.1.0", "@node-rs/argon2-android-arm64": "2.1.0", "@node-rs/argon2-darwin-arm64": "2.1.0", "@node-rs/argon2-darwin-x64": "2.1.0", "@node-rs/argon2-freebsd-x64": "2.1.0", "@node-rs/argon2-linux-arm-gnueabihf": "2.1.0", "@node-rs/argon2-linux-arm64-gnu": "2.1.0", "@node-rs/argon2-linux-arm64-musl": "2.1.0", "@node-rs/argon2-linux-x64-gnu": "2.1.0", "@node-rs/argon2-linux-x64-musl": "2.1.0", "@node-rs/argon2-win32-arm64-msvc": "2.1.0", "@node-rs/argon2-win32-ia32-msvc": "2.1.0", "@node-rs/argon2-win32-x64-msvc": "2.1.0" } }, "sha512-VBOWfM2u58/to3DFqTGJ2U5cJKQwmjN2zxzsQNZ5a2o8Z6aUrhvqQh8NdgotIF1Y0tMsBNtzOBDBdfvvkwJDSQ=="],
 
