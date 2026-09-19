@@ -41,9 +41,25 @@ import { HeaderDecodeError } from '../../src/errors/index.js';               // 
 describe('header encode/decode - extra cases', () => {
   const salt = new Uint8Array(12).fill(7);
 
-  it('throws on unknown scheme id', () => {
-    const bad = encodeHeader(7, 'low', 'low', salt);   // id 7 is unregistered
-    expect(() => decodeHeader(bad)).toThrow(HeaderDecodeError);
+  it('rejects an unknown scheme id before encoding', () => {
+    expect(() => encodeHeader(7, 'low', 'low', salt)).toThrow();
+  });
+
+  it('rejects a salt whose length does not match the selected strength', () => {
+    expect(() => encodeHeader(0, 'low', 'high', salt)).toThrow(
+      'Scheme 0 high salt must be 16 bytes',
+    );
+  });
+
+  it('rejects unsupported runtime format values', () => {
+    expect(() => encodeHeader(
+      0,
+      'low',
+      'low',
+      salt,
+      undefined,
+      'future' as any,
+    )).toThrow('Unsupported stream format');
   });
 
   it('throws InvalidHeaderError when header is too short', () => {

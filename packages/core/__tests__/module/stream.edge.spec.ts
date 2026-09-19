@@ -8,6 +8,10 @@ import { EncryptTransform } from '../../src/stream/EncryptTransform.js';
 import { DecryptTransform } from '../../src/stream/DecryptTransform.js';
 import type { EncryptionAlgorithm } from '../../src/types/index.js';
 import { collectStream as collect } from '../../src/util/stream.js';
+import {
+  assertStreamRecordIndex,
+  MAX_STREAM_RECORD_INDEX,
+} from '../../src/util/frame.js';
 import { makeCrypt, randomBytes, SCHEMES } from '../test.constants.js';
 
 /* Echo engine with realistic IV/TAG sizing so min-frame maths are exercised. */
@@ -87,5 +91,17 @@ describe('DecryptTransform frame reassembly', () => {
       }).pipeThrough(dec),
     );
     expect(out).toEqual(plain);
+  });
+});
+
+describe('Authenticated stream record-index boundary', () => {
+  it('accepts the complete uint64 range', () => {
+    expect(() => assertStreamRecordIndex(0n)).not.toThrow();
+    expect(() => assertStreamRecordIndex(MAX_STREAM_RECORD_INDEX)).not.toThrow();
+  });
+
+  it('rejects values outside the uint64 range', () => {
+    expect(() => assertStreamRecordIndex(-1n)).toThrow(RangeError);
+    expect(() => assertStreamRecordIndex(MAX_STREAM_RECORD_INDEX + 1n)).toThrow(RangeError);
   });
 });

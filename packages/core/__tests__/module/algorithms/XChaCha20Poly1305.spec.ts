@@ -162,4 +162,41 @@ describe('XChaCha20Poly1305 + BaseAEADWithPadAAD (integration)', () => {
     enc.zeroKey();
     await expect(enc.encryptChunk(makePlain(8))).rejects.toThrow('Encryption key not set');
   });
+
+  it('rejects non-extractable and incorrectly sized keys', async () => {
+    const cipher = new XChaCha20Poly1305(nodeProvider as any);
+    const nonExtractable = await nodeProvider.subtle.generateKey(
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt'],
+    ) as CryptoKey;
+    await expect(cipher.setKey(nonExtractable)).rejects.toThrow('extractable CryptoKey');
+
+    const shortKey = await nodeProvider.subtle.generateKey(
+      { name: 'AES-GCM', length: 128 },
+      true,
+      ['encrypt', 'decrypt'],
+    ) as CryptoKey;
+    await expect(cipher.setKey(shortKey)).rejects.toThrow('32-byte key');
+    await expect(cipher.encryptChunk(makePlain(8))).rejects.toThrow('Encryption key not set');
+  });
+
+  it('wipes the previous raw key before replacement or replacement failure', async () => {
+    const cipher = new XChaCha20Poly1305(nodeProvider as any);
+    await cipher.setKey(await importExtractableRawKey(new Uint8Array(32).fill(1)));
+    const previous = (cipher as unknown as { key: Uint8Array }).key;
+
+    await cipher.setKey(await importExtractableRawKey(new Uint8Array(32).fill(2)));
+    expect(previous.every(byte => byte === 0)).toBe(true);
+
+    const replacement = (cipher as unknown as { key: Uint8Array }).key;
+    const nonExtractable = await nodeProvider.subtle.generateKey(
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt'],
+    ) as CryptoKey;
+    await expect(cipher.setKey(nonExtractable)).rejects.toThrow();
+    expect(replacement.every(byte => byte === 0)).toBe(true);
+    await expect(cipher.encryptChunk(makePlain(8))).rejects.toThrow('Encryption key not set');
+  });
 });

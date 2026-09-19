@@ -801,6 +801,8 @@ export class Cryptit {
     const secret = { value: pass };
     let buf: Uint8Array = new Uint8Array(0);
     let downstream: TransformStream<Uint8Array, Uint8Array> | null = null;
+    let downstreamPump: Promise<void> | null = null;
+    let downstreamError: unknown = null;
 
     const MAX_HEADER_PREFIX = 64 * 1024;
     const MIN_INFO_BYTES    = 2;
@@ -810,11 +812,26 @@ export class Cryptit {
       ctl: TransformStreamDefaultController<Uint8Array>,
     ) => {
       const rd = readable.getReader();
-      while (true) {
-        const { value, done } = await rd.read();
-        if (done) break;
-        ctl.enqueue(value!);
+      try {
+        while (true) {
+          const { value, done } = await rd.read();
+          if (done) break;
+          ctl.enqueue(value);
+        }
+      } finally {
+        rd.releaseLock();
       }
+    };
+
+    const writeDownstream = async (chunk: Uint8Array): Promise<void> => {
+      if (!downstream) throw new DecryptionError('Decryption stream is not initialized');
+      const writer = downstream.writable.getWriter();
+      try {
+        await writer.write(chunk);
+      } finally {
+        writer.releaseLock();
+      }
+      if (downstreamError) throw downstreamError;
     };
 
     return new TransformStream<Uint8Array, Uint8Array>({
@@ -888,44 +905,45 @@ export class Cryptit {
             return;
           }
           try {
-            await EngineManager.deriveKey(engine, secret, parsed.salt, parsed.difficulty);
-          } finally {
-            zeroizeString(secret);
-            pass = null;
-          }
+            try {
+              await EngineManager.deriveKey(engine, secret, parsed.salt, parsed.difficulty);
+            } finally {
+              zeroizeString(secret);
+              pass = null;
+            }
 
-          // Bind AAD, configure cipher
-          decodeHeader(headerBytes, engine.cipher);
-          engine.cipher.setPaddingAADMode('forbid');
-          engine.cipher.setLegacyAADFallback({
-            enabled: parsed.streamFormat === 'legacy',
-            policy: 'auto',
-            tryEmptyAAD: parsed.streamFormat === 'legacy' && this.acceptUnauthenticatedHeader,
-          });
+            // Bind AAD, configure cipher
+            decodeHeader(headerBytes, engine.cipher);
+            engine.cipher.setPaddingAADMode('forbid');
+            engine.cipher.setLegacyAADFallback({
+              enabled: parsed.streamFormat === 'legacy',
+              policy: 'auto',
+              tryEmptyAAD: parsed.streamFormat === 'legacy' && this.acceptUnauthenticatedHeader,
+            });
 
-          // Build downstream using WRITER's chunkSize from the header/engine
-          downstream = new DecryptTransform(engine.cipher, engine.chunkSize, {
-            format: parsed.streamFormat,
-            header: headerBytes,
-          }).toTransformStream();
-          void pipeOut(downstream.readable, ctl).catch(err => ctl.error(err));
+            // Build downstream using WRITER's chunkSize from the header/engine
+            downstream = new DecryptTransform(engine.cipher, engine.chunkSize, {
+              format: parsed.streamFormat,
+              header: headerBytes,
+            }).toTransformStream();
+            downstreamPump = pipeOut(downstream.readable, ctl).catch(err => {
+              downstreamError = err;
+            });
 
-          // Immediately forward remainder of buffered data + any tail from this chunk
-          const remainder = buf.subarray(hdrLen);
-          buf = new Uint8Array(0);
-          if (remainder.byteLength || tail.byteLength) {
-            const w = downstream.writable.getWriter();
-            if (remainder.byteLength) await w.write(remainder);
-            if (tail.byteLength)      await w.write(tail);
-            w.releaseLock();
+            // Immediately forward remainder of buffered data + any tail from this chunk
+            const remainder = buf.subarray(hdrLen);
+            buf = new Uint8Array(0);
+            if (remainder.byteLength) await writeDownstream(remainder);
+            if (tail.byteLength) await writeDownstream(tail);
+          } catch (err) {
+            engine.cipher.zeroKey();
+            throw err;
           }
           return;
         }
 
         // Already initialized: pass through
-        const writer = downstream.writable.getWriter();
-        await writer.write(chunk);
-        writer.releaseLock();
+        await writeDownstream(chunk);
       },
 
       flush: async () => {
@@ -934,8 +952,13 @@ export class Cryptit {
           throw new InvalidHeaderError('Header not found before end of stream');
         }
         const writer = downstream.writable.getWriter();
-        await writer.close();
-        writer.releaseLock();
+        try {
+          await writer.close();
+        } finally {
+          writer.releaseLock();
+        }
+        await downstreamPump;
+        if (downstreamError) throw downstreamError;
       },
     });
   }

@@ -62,7 +62,20 @@ export class XChaCha20Poly1305 extends BaseAEADWithPadAAD implements PaddingAwar
    * - Ensure the provided key was created/imported with `extractable: true`.
    */
   public async setKey(k: CryptoKey) {
-    this.key = new Uint8Array(await this.p.subtle.exportKey('raw', k));
+    this.zeroKey();
+    if (!k || k.type !== 'secret') {
+      throw new TypeError('XChaCha20-Poly1305 requires a secret CryptoKey');
+    }
+    if (!k.extractable) {
+      throw new TypeError('XChaCha20-Poly1305 requires an extractable CryptoKey');
+    }
+
+    const raw = new Uint8Array(await this.p.subtle.exportKey('raw', k));
+    if (raw.length !== 32) {
+      raw.fill(0);
+      throw new TypeError('XChaCha20-Poly1305 requires a 32-byte key');
+    }
+    this.key = raw;
   }
 
   /**

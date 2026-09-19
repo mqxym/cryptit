@@ -2,7 +2,7 @@
 const LEN_BYTES = 4 as const;
 const TERMINAL_FLAG = 0x80000000;
 const LENGTH_MASK = 0x7fffffff;
-const MAX_RECORD_INDEX = 0xffffffffffffffffn;
+export const MAX_STREAM_RECORD_INDEX = 0xffffffffffffffffn;
 
 export const MAX_PLAINTEXT_CHUNK_SIZE = 128 * 1024 * 1024;
 export const MAX_STREAM_WRITE_SIZE = 64 * 1024 * 1024;
@@ -14,6 +14,12 @@ export interface StreamRecord {
   length: number;
   terminal: boolean;
   word: number;
+}
+
+export function assertStreamRecordIndex(recordIndex: bigint): void {
+  if (recordIndex < 0n || recordIndex > MAX_STREAM_RECORD_INDEX) {
+    throw new RangeError('Stream record index exceeds uint64');
+  }
 }
 
 export function encodeFrameLen(n: number): Uint8Array {
@@ -43,9 +49,7 @@ export function buildStreamRecordAAD(
   recordIndex: bigint,
   record: Pick<StreamRecord, 'terminal' | 'word'>,
 ): Uint8Array {
-  if (recordIndex < 0n || recordIndex > MAX_RECORD_INDEX) {
-    throw new RangeError('Stream record index exceeds uint64');
-  }
+  assertStreamRecordIndex(recordIndex);
 
   const domain = new Uint8Array([0x43, 0x52, 0x59, 0x50, 0x54, 0x49, 0x54, 0x01]);
   const metadata = new Uint8Array(13);

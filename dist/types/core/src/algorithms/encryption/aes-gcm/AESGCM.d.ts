@@ -1,6 +1,7 @@
 import { CryptoProvider } from '../../../providers/CryptoProvider.js';
 import { BaseAEADWithPadAAD } from '../base/BaseAEADWithPadAAD.js';
 import type { PaddingAwareEncryptionAlgorithm } from '../../../types/index.js';
+export declare const MAX_AES_GCM_INVOCATIONS_PER_KEY = 4294967296;
 /**
  * AES-GCM encryption with padding policy binding via {@link BaseAEADWithPadAAD}.
  *
@@ -28,6 +29,7 @@ export declare class AESGCM extends BaseAEADWithPadAAD implements PaddingAwareEn
     readonly IV_LENGTH: number;
     readonly TAG_LENGTH: number;
     private key;
+    private static readonly encryptionInvocations;
     constructor(p: CryptoProvider);
     setKey(k: CryptoKey): Promise<void>;
     zeroKey(): void;

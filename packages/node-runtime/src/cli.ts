@@ -73,14 +73,37 @@ async function resolvePassphrase(
     return options.pass;
   }
   if (options.passFile !== undefined) {
-    const stat = await fsp.stat(options.passFile);
     const maxBytes = 64 * 1024;
-    if (!stat.isFile() || stat.size > maxBytes) {
-      throw new Error(`Passphrase file must be a regular file no larger than ${maxBytes} bytes`);
+    const handle = await fsp.open(options.passFile, 'r');
+    const buffer = Buffer.alloc(maxBytes + 1);
+    try {
+      const stat = await handle.stat();
+      if (!stat.isFile() || stat.size > maxBytes) {
+        throw new Error(`Passphrase file must be a regular file no larger than ${maxBytes} bytes`);
+      }
+
+      let totalRead = 0;
+      while (totalRead < buffer.length) {
+        const { bytesRead } = await handle.read(
+          buffer,
+          totalRead,
+          buffer.length - totalRead,
+          totalRead,
+        );
+        if (bytesRead === 0) break;
+        totalRead += bytesRead;
+      }
+      if (totalRead > maxBytes) {
+        throw new Error(`Passphrase file must be no larger than ${maxBytes} bytes`);
+      }
+
+      const value = buffer.subarray(0, totalRead).toString('utf8').replace(/\r?\n$/, '');
+      if (!value) throw new Error('Passphrase file cannot be empty');
+      return value;
+    } finally {
+      buffer.fill(0);
+      await handle.close();
     }
-    const value = (await fsp.readFile(options.passFile, 'utf8')).replace(/\r?\n$/, '');
-    if (!value) throw new Error('Passphrase file cannot be empty');
-    return value;
   }
   if (canPrompt) return promptPass();
   throw new Error('Use --pass-file or --pass when piping via STDIN');
@@ -119,9 +142,11 @@ async function openOutputTransaction(
     throw new FilesystemError('Refusing to write outside of root directory.');
   }
 
+  const destinationPath = resolve(realTarget, basename(absOut));
+
   const tempPath = resolve(
     realTarget,
-    `.${basename(absOut)}.cryptit-tmp-${randomUUID()}`,
+    `.${basename(destinationPath)}.cryptit-tmp-${randomUUID()}`,
   );
   const stream = createWriteStream(tempPath, { flags: 'wx', mode: 0o600 });
   await new Promise<void>((resolveOpen, rejectOpen) => {
@@ -144,12 +169,12 @@ async function openOutputTransaction(
       if (settled) return;
       await finished(stream);
       try {
-        await fsp.rename(tempPath, absOut);
+        await fsp.rename(tempPath, destinationPath);
       } catch (err) {
         const code = (err as NodeJS.ErrnoException).code;
         if (code !== 'EEXIST' && code !== 'EPERM') throw err;
-        await fsp.unlink(absOut);
-        await fsp.rename(tempPath, absOut);
+        await fsp.unlink(destinationPath);
+        await fsp.rename(tempPath, destinationPath);
       }
       settled = true;
     },
@@ -195,6 +220,7 @@ program
       .hideHelp()            // if you don’t want it listed in help
       .argParser((v) => {
         if (!v.trim()) throw new Error('Passphrase cannot be empty');
+        redactPassArg(v);
         return v;
       })
   )
@@ -241,7 +267,7 @@ program
   );
 
 
-process.on('uncaughtException', err => {
+function reportError(err: unknown): void {
   if (err instanceof Error) {
     const name = err.constructor.name;
     const msg = err.message;
@@ -249,19 +275,7 @@ process.on('uncaughtException', err => {
   } else {
     stderr.write(`Error [Unknown]: ${String(err)}\n`);
   }
-  processExit(1);
-});
-
-process.on('unhandledRejection', (err: unknown) => {
-  if (err instanceof Error) {
-    const name = err.constructor.name;
-    const msg = err.message;
-    stderr.write(`Error [${name}]: ${msg}\n`);
-  } else {
-    stderr.write(`Error [Unknown]: ${String(err)}\n`);
-  }
-  processExit(1);
-});
+}
 
 
 /* ------------------------------------------------------------------ */
@@ -343,15 +357,17 @@ program
     /** Stream STDIN to a temporary file and return its absolute path */
     async function stdinToTempFile(): Promise<string> {
       // Default 10 GiB limit; allow override via env (bytes)
-      const envLimit = Number(process.env.CRYPTIT_STDIN_MAX_BYTES);
       const TEN_GIB = 10 * 1024 * 1024 * 1024; // 10_737_418_240
-      const MAX_BYTES = Number.isFinite(envLimit) && envLimit > 0
-        ? Math.floor(envLimit)
-        : TEN_GIB; // 10 GiB
+      const configuredLimit = process.env.CRYPTIT_STDIN_MAX_BYTES;
+      const envLimit = configuredLimit === undefined ? TEN_GIB : Number(configuredLimit);
+      if (!Number.isSafeInteger(envLimit) || envLimit <= 0) {
+        throw new FilesystemError('CRYPTIT_STDIN_MAX_BYTES must be a positive safe integer');
+      }
+      const MAX_BYTES = envLimit;
 
       const dir     = await fsp.mkdtemp(path.join(os.tmpdir(), 'cryptit-'));
       const tmpPath = path.join(dir, 'stdin.bin');
-      const out     = createWriteStream(tmpPath, { flags: 'w' });
+      const out     = createWriteStream(tmpPath, { flags: 'wx', mode: 0o600 });
 
       let written = 0;
 
@@ -534,6 +550,7 @@ program
       acceptUnauthenticatedHeader: cmd.legacy,
     });
 
+    const pass = await resolvePassphrase(opts, stdin.isTTY);
     let output: OutputTransaction;
     try {
       output = await openOutputTransaction(cmd.out);
@@ -541,9 +558,6 @@ program
       stderr.write(`Error: ${err.message}\n`);
       processExit(1);
     }
-
-
-    const pass = await resolvePassphrase(opts, stdin.isTTY);
     const inStream  = src  === '-' ? stdin  : createReadStream(src);
     try {
       const webIn  = toWebReadable(inStream);
@@ -656,9 +670,16 @@ program
     }
   });
 
-if (process.argv.length <= 2) {
-  program.outputHelp();
-  process.exit(1);
+async function main(): Promise<void> {
+  if (process.argv.length <= 2) {
+    program.outputHelp();
+    process.exit(1);
+  }
+
+  await program.parseAsync();
 }
 
-program.parse();
+void main().catch(err => {
+  reportError(err);
+  processExit(1);
+});

@@ -15,4 +15,11 @@ describe('SchemeRegistry', () => {
     const dup = SchemeRegistry.current;
     expect(() => SchemeRegistry.register(dup)).toThrow(SchemeError);
   });
+
+  it('rejects ids that cannot be represented in the header', () => {
+    const current = SchemeRegistry.current;
+    expect(() => SchemeRegistry.register({ ...current, id: -1 })).toThrow(SchemeError);
+    expect(() => SchemeRegistry.register({ ...current, id: 8 })).toThrow(SchemeError);
+    expect(() => SchemeRegistry.register({ ...current, id: 1.5 })).toThrow(SchemeError);
+  });
 });
