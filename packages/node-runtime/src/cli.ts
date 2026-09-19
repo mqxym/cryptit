@@ -15,7 +15,7 @@ import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path
 import { toWebReadable, toWebWritable } from './streamAdapter.js';
 
 
-const PKG_VERSION = '2.4.0'; // sync with root package.json
+const PKG_VERSION = '2.5.1'; // sync with root package.json
 
 const DEFAULT_ROOT = process.cwd();
 
