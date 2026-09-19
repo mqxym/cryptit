@@ -1,8 +1,10 @@
 import { CryptoProvider } from '../../../providers/CryptoProvider.js';
-import { DecryptionError } from '../../../errors/index.js';
+import { DecryptionError, EncryptionError } from '../../../errors/index.js';
 import { BaseAEADWithPadAAD } from '../base/BaseAEADWithPadAAD.js';
 import type { PaddingAwareEncryptionAlgorithm } from '../../../types/index.js';
 import { asArrayBufferView } from '../../../util/bytes.js';
+
+export const MAX_AES_GCM_INVOCATIONS_PER_KEY = 0x1_0000_0000;
 
 /**
  * AES-GCM encryption with padding policy binding via {@link BaseAEADWithPadAAD}.
@@ -33,14 +35,24 @@ export class AESGCM extends BaseAEADWithPadAAD implements PaddingAwareEncryption
   public readonly TAG_LENGTH = AESGCM.TAG_LENGTH;
 
   private key: CryptoKey | null = null;
+  private static readonly encryptionInvocations = new WeakMap<CryptoKey, number>();
 
   constructor(p: CryptoProvider) { super(p); }
 
-  public async setKey(k: CryptoKey) { this.key = k; }
+  public async setKey(k: CryptoKey) {
+    this.key = k;
+  }
 
   public zeroKey() { this.key = null; }
 
   protected async encryptWithAAD(toEncrypt: Uint8Array, aad: Uint8Array): Promise<Uint8Array> {
+    const key = this.requireKey();
+    const invocations = AESGCM.encryptionInvocations.get(key) ?? 0;
+    if (invocations >= MAX_AES_GCM_INVOCATIONS_PER_KEY) {
+      throw new EncryptionError('AES-GCM per-key encryption limit reached');
+    }
+    AESGCM.encryptionInvocations.set(key, invocations + 1);
+
     const iv = asArrayBufferView(
       this.p.getRandomValues(new Uint8Array(AESGCM.IV_LENGTH))
     );
@@ -53,7 +65,7 @@ export class AESGCM extends BaseAEADWithPadAAD implements PaddingAwareEncryption
       additionalData: aadView,
     };
 
-    const cipherBuf = await this.p.subtle.encrypt(params, this.requireKey(), plainView);
+    const cipherBuf = await this.p.subtle.encrypt(params, key, plainView);
     const cipher = new Uint8Array(cipherBuf);
 
     const out = new Uint8Array(iv.length + cipher.length);

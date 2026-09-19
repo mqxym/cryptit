@@ -1,4 +1,7 @@
-import { AESGCM } from '../../../src/algorithms/encryption/aes-gcm/AESGCM.js';
+import {
+  AESGCM,
+  MAX_AES_GCM_INVOCATIONS_PER_KEY,
+} from '../../../src/algorithms/encryption/aes-gcm/AESGCM.js';
 import { Magic48VerCrc8Padding } from '../../../src/algorithms/padding/magic48ver-crc8.js';
 import { DecryptionError } from '../../../src/errors/index.js';
 import { nodeProvider, generateAesGcmKey } from './_helper.js';
@@ -199,5 +202,45 @@ describe('AESGCM + BaseAEADWithPadAAD (integration)', () => {
     await aes.setKey(await generateAesGcmKey());
     aes.zeroKey();
     await expect(aes.encryptChunk(makePlain(8))).rejects.toThrow('Encryption key not set');
+  });
+
+  it('rejects encryption after the per-key invocation limit', async () => {
+    const aes = new AESGCM(nodeProvider as any);
+    const key = await generateAesGcmKey();
+    await aes.setKey(key);
+    (AESGCM as unknown as { encryptionInvocations: WeakMap<CryptoKey, number> })
+      .encryptionInvocations.set(key, MAX_AES_GCM_INVOCATIONS_PER_KEY);
+
+    await expect(aes.encryptChunk(makePlain(8))).rejects.toThrow(
+      'AES-GCM per-key encryption limit reached',
+    );
+  });
+
+  it('resets the invocation limit only when the loaded key changes', async () => {
+    const aes = new AESGCM(nodeProvider as any);
+    const firstKey = await generateAesGcmKey();
+    await aes.setKey(firstKey);
+    (AESGCM as unknown as { encryptionInvocations: WeakMap<CryptoKey, number> })
+      .encryptionInvocations.set(firstKey, MAX_AES_GCM_INVOCATIONS_PER_KEY);
+
+    await aes.setKey(firstKey);
+    await expect(aes.encryptChunk(makePlain(8))).rejects.toThrow(
+      'AES-GCM per-key encryption limit reached',
+    );
+
+    await aes.setKey(await generateAesGcmKey());
+    await expect(aes.encryptChunk(makePlain(8))).resolves.toBeInstanceOf(Uint8Array);
+
+    aes.zeroKey();
+    await aes.setKey(firstKey);
+    await expect(aes.encryptChunk(makePlain(8))).rejects.toThrow(
+      'AES-GCM per-key encryption limit reached',
+    );
+
+    const secondCipher = new AESGCM(nodeProvider as any);
+    await secondCipher.setKey(firstKey);
+    await expect(secondCipher.encryptChunk(makePlain(8))).rejects.toThrow(
+      'AES-GCM per-key encryption limit reached',
+    );
   });
 });

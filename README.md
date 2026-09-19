@@ -180,7 +180,7 @@ cryptit encrypt  <in> [-o out] [options]
 cryptit decrypt  <in> [-o out] [options]
 
 # encrypt text
-echo "secret" | cryptit encrypt-text  -p pw
+echo "secret" | cryptit encrypt-text  --pass-file ~/.secret_pass
 cryptit encrypt-text "secret" -d high -S 1 # -> Prompt for password, Argon2id difficulty "high" and Scheme 1
 
 # decrypt text
@@ -245,6 +245,8 @@ Exit codes: **0** success · **1** any failure (invalid header, auth, I/O …)
   create a writer with `{ streamFormat: "legacy" }` when old readers must consume
   newly encrypted files. Legacy framing does not authenticate record order or a
   terminal record and should only be used for that compatibility requirement.
+  Re-encrypt legacy containers with the default format when old-reader support is
+  no longer required.
 * `Cryptit.decodeData()` reports `format` and `authenticated` for chunked payloads.
 * Services accepting untrusted ciphertext can set
   `{ maxDecryptionDifficulty: "low" | "middle" | "high" }` to reject a more
@@ -279,22 +281,31 @@ bun install && bun run build && bun test
 * Argon2-id presets (low / middle / high); configured memory values are in KiB,
   giving the current schemes 64-96 MiB memory costs
 * Salts generated per-ciphertext; never reused
+* AES-GCM refuses more than 2^32 encryption invocations with one loaded
+  `CryptoKey`. Loading a different key starts an independent invocation budget.
 * File/stream records are sequence-authenticated and require an authenticated end marker
 * Mutable cipher state is isolated per operation and keys are cleared on completion or failure
 * CLI file output is written to a restrictive same-directory temporary file and
   renamed into place only after the complete operation succeeds
+* Custom `CryptoProvider` implementations are trusted to supply cryptographically
+  secure randomness and a conforming WebCrypto implementation
 
 For stdout decryption, consumers must treat emitted bytes as provisional until the
 command exits successfully. A terminal authentication failure cannot retract bytes
 already consumed from a pipe.
 
+Authentication of an individual stream record does not by itself prove that the
+whole stream is complete. Successful completion requires validation of the final
+authenticated empty terminal record. See [SECURITY.md](SECURITY.md) for reporting
+instructions and the complete security boundary.
+
 ---
 
-## CLI Benchmarks (Cryptit 2.4.0, Bun 1.4.0, macOS, M3 Pro)
+## CLI Benchmarks (Cryptit 2.5.0, Bun 1.4.2, macOS, M3 Pro)
 
 > **TL;DR**
-> • **Scheme 0** (AES‑GCM/SubtleCrypto) is much faster for streaming: **peak ~1,174 MiB/s** (decrypt stdin→stdout, 1 GiB, *high*).
-> • **Scheme 1** (XChaCha20‑Poly1305) peaks **~187 MiB/s**.
+> • **Scheme 0** (AES‑GCM/SubtleCrypto) is much faster for streaming: **peak ~1,015 MiB/s** (encrypt stdin→stdout, 1 GiB, *high*).
+> • **Scheme 1** (XChaCha20‑Poly1305) peaks **~169 MiB/s**.
 > • KDF cost is now measured separately and **not** included in “stream‑only” throughput below.
 
 ---
@@ -303,9 +314,9 @@ already consumed from a pipe.
 
 | Difficulty | KDF avg (Scheme 0) | KDF avg (Scheme 1) |
 | :--------: | -----------------: | -----------------: |
-|     low    |         187.79 ms  |         186.39 ms  |
-|   middle   |         569.71 ms  |         490.57 ms  |
-|    high    |        1079.33 ms  |         881.34 ms  |
+|     low    |         138.72 ms  |         115.78 ms  |
+|   middle   |         451.63 ms  |         172.52 ms  |
+|    high    |         826.76 ms  |         300.12 ms  |
 
 <details>
 <summary><strong>Stream‑only Throughput (KDF‑subtracted) — Scheme 0</strong></summary>
@@ -314,9 +325,9 @@ already consumed from a pipe.
 
 |    Size   |  Difficulty  |  enc f→f  |  dec f→out  |   enc in→out  |  dec in→out  |
 | :-------: | :----------: | --------: | ----------: | ------------: | -----------: |
-|    1 GiB  |    low       |   605.39  |     581.84  |      1015.35  |     1068.40  |
-|    1 GiB  |    middle    |   577.80  |     577.68  |      1017.11  |     1053.58  |
-|    1 GiB  |    high      |   654.19  |     652.13  |      1103.43  |  **1174.03**  |
+|    1 GiB  |    low       |   580.74  |     630.70  |       919.22  |      828.95  |
+|    1 GiB  |    middle    |   562.16  |     690.75  |       977.37  |      878.60  |
+|    1 GiB  |    high      |   555.89  |     704.89  |  **1014.75**  |      852.49  |
 
 </details>
 
@@ -327,9 +338,9 @@ already consumed from a pipe.
 
 |    Size   |  Difficulty  |  enc f→f  |  dec f→out  |  enc in→out  |  dec in→out  |
 | :-------: | :----------: | --------: | ----------: | -----------: | -----------: |
-|    1 GiB  |    low       |   164.26  |     157.17  |      186.09  |      181.77  |
-|    1 GiB  |    middle    |   165.23  |     156.97  |  **186.63**  |      181.86  |
-|    1 GiB  |    high      |   165.53  |     157.20  |      183.02  |      181.59  |
+|    1 GiB  |    low       |   147.86  |     151.37  |  **168.96**  |      158.51  |
+|    1 GiB  |    middle    |   152.17  |     151.74  |      167.54  |      163.03  |
+|    1 GiB  |    high      |   132.74  |     133.44  |      152.44  |      144.00  |
 
 </details>
 
@@ -340,9 +351,9 @@ already consumed from a pipe.
 
 |    Size   |  Difficulty  |           enc f→f  |         dec f→out  |        enc in→out  |        dec in→out  |  decode file (ms)  |  decode stdin (ms)  |
 | :-------: | :----------: | -----------------: | -----------------: | -----------------: | -----------------: | -----------------: | ------------------: |
-|    1 GiB  |    low       |  1880 ms / 1.88 s  |  1948 ms / 1.95 s  |  1196 ms / 1.20 s  |  1146 ms / 1.15 s  |                72  |                570  |
-|    1 GiB  |    middle    |  2344 ms / 2.34 s  |  2343 ms / 2.34 s  |  1577 ms / 1.58 s  |  1547 ms / 1.55 s  |                71  |                539  |
-|    1 GiB  |    high      |  2645 ms / 2.65 s  |  2650 ms / 2.65 s  |  2008 ms / 2.01 s  |  1952 ms / 1.95 s  |                64  |                509  |
+|    1 GiB  |    low       |  1904 ms / 1.90 s  |  1784 ms / 1.78 s  |  1278 ms / 1.28 s  |  1385 ms / 1.39 s  |                86  |                626  |
+|    1 GiB  |    middle    |  2280 ms / 2.28 s  |  1938 ms / 1.94 s  |  1502 ms / 1.50 s  |  1621 ms / 1.62 s  |                65  |                561  |
+|    1 GiB  |    high      |  2673 ms / 2.67 s  |  2284 ms / 2.28 s  |  1853 ms / 1.85 s  |  2052 ms / 2.05 s  |                65  |                566  |
 
 </details>
 
@@ -353,9 +364,9 @@ already consumed from a pipe.
 
 |    Size   |  Difficulty  |           enc f→f  |         dec f→out  |        enc in→out  |        dec in→out  |  decode file (ms)  |  decode stdin (ms)  |
 | :-------: | :----------: | -----------------: | -----------------: | -----------------: | -----------------: | -----------------: | ------------------: |
-|    1 GiB  |    low       |  6421 ms / 6.42 s  |  6703 ms / 6.70 s  |  5689 ms / 5.69 s  |  5820 ms / 5.82 s  |                64  |                489  |
-|    1 GiB  |    middle    |  6688 ms / 6.69 s  |  7014 ms / 7.01 s  |  5977 ms / 5.98 s  |  6122 ms / 6.12 s  |                64  |                512  |
-|    1 GiB  |    high      |  7067 ms / 7.07 s  |  7396 ms / 7.40 s  |  6483 ms / 6.48 s  |  6521 ms / 6.52 s  |                63  |                514  |
+|    1 GiB  |    low       |  7049 ms / 7.05 s  |  6884 ms / 6.88 s  |  6186 ms / 6.19 s  |  6578 ms / 6.58 s  |                79  |                585  |
+|    1 GiB  |    middle    |  6907 ms / 6.91 s  |  6934 ms / 6.93 s  |  6301 ms / 6.30 s  |  6473 ms / 6.47 s  |                70  |                572  |
+|    1 GiB  |    high      |  8027 ms / 8.03 s  |  7994 ms / 7.99 s  |  7043 ms / 7.04 s  |  7425 ms / 7.43 s  |                91  |                587  |
 
 </details>
 
@@ -365,7 +376,7 @@ already consumed from a pipe.
 **Method notes**
 • CLI: `bun run cli:run`  • Difficulties: low/middle/high  • Size: 1 GiB  • Repeats: 5
 • **KDF repeats = 10**, payload = 16 bytes. “Stream‑only” removes the measured KDF baseline for the respective difficulty; wall‑clock shows full end‑to‑end time.
-• Values are arithmetic means. Across the 24 five-run throughput series, 22 had a sample coefficient of variation below 4.1%; the maximum was 8.1%.
+• Values are arithmetic means. Results are end-to-end measurements and include runtime, OS, and storage variability.
 
 ---
 

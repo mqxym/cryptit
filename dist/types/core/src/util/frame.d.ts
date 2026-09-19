@@ -1,3 +1,4 @@
+export declare const MAX_STREAM_RECORD_INDEX = 18446744073709551615n;
 export declare const MAX_PLAINTEXT_CHUNK_SIZE: number;
 export declare const MAX_STREAM_WRITE_SIZE: number;
 export declare const MAX_CIPHER_FRAME_SIZE: number;
@@ -7,6 +8,7 @@ export interface StreamRecord {
     terminal: boolean;
     word: number;
 }
+export declare function assertStreamRecordIndex(recordIndex: bigint): void;
 export declare function encodeFrameLen(n: number): Uint8Array;
 export declare function encodeStreamRecord(length: number, terminal?: boolean): Uint8Array;
 export declare function decodeStreamRecord(buf: Uint8Array, off?: number): StreamRecord;

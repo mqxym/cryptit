@@ -10,13 +10,19 @@ import { execa } from 'execa';
 const CLI  = resolve(join(__dirname, '..', 'src', 'cli.ts'));
 const isBun = typeof Bun !== 'undefined' || !!process.env.BUN;
 const NODE_LOADER = 'ts-node/esm';
-const run = (args: string[], cwd?: string) => {
+const run = (
+  args: string[],
+  cwd?: string,
+  options: { env?: Record<string, string>; input?: string | Buffer } = {},
+) => {
   const bin   = isBun ? 'bun' : 'node';
   const extra = isBun ? [] : ['--loader', NODE_LOADER];
   return execa(bin, [...extra, CLI, ...args], {
     encoding: 'utf8',
     reject: false,          // do not throw on exitCode ≠ 0
     cwd,
+    env: options.env,
+    input: options.input,
   });
 };
 
@@ -122,6 +128,48 @@ describe('cryptit CLI - passphrase files', () => {
       expect(decrypted.exitCode).toBe(0);
       expect(await fs.readFile(join(dir, 'restored.bin')))
         .toEqual(await fs.readFile(join(dir, 'plain.bin')));
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects passphrase files larger than 64 KiB', async () => {
+    const dir = await fs.mkdtemp(`${tmpdir()}/cryptit-pass-file-`);
+    await fs.writeFile(join(dir, 'pass.txt'), Buffer.alloc(64 * 1024 + 1, 0x61));
+
+    try {
+      const result = await run([
+        'encrypt-text', 'secret', '--pass-file', 'pass.txt',
+      ], dir);
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stderr).toMatch(/no larger than 65536 bytes/);
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('cryptit CLI - bounded temporary input', () => {
+  it('rejects invalid CRYPTIT_STDIN_MAX_BYTES values', async () => {
+    const result = await run(['decode', '-'], undefined, {
+      env: { CRYPTIT_STDIN_MAX_BYTES: 'not-a-number' },
+      input: 'AQ==',
+    });
+
+    expect(result.exitCode).not.toBe(0);
+    expect(result.stderr).toMatch(/positive safe integer/);
+  });
+
+  it('does not open a decrypt output transaction before passphrase resolution', async () => {
+    const dir = await fs.mkdtemp(`${tmpdir()}/cryptit-output-`);
+    await fs.writeFile(join(dir, 'cipher.bin'), randomBytes(64));
+
+    try {
+      const result = await run([
+        'decrypt', 'cipher.bin', '--out', 'restored.bin',
+      ], dir);
+      expect(result.exitCode).not.toBe(0);
+      expect(await fs.readdir(dir)).toEqual(['cipher.bin']);
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
     }

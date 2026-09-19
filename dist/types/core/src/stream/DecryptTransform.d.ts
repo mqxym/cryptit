@@ -12,6 +12,8 @@ export declare class DecryptTransform {
     private readonly engine;
     private readonly chunkSize;
     private buffer;
+    private bufferedLength;
+    private bufferedFrameLength;
     private recordIndex;
     private terminalSeen;
     private failed;
@@ -21,5 +23,12 @@ export declare class DecryptTransform {
     toTransformStream(): TransformStream<Uint8Array | ArrayBuffer | Blob, Uint8Array>;
     private transform;
     private flush;
+    private readRecord;
+    private decryptRecord;
+    private appendToBuffer;
+    private stashPartial;
+    private resetBuffer;
+    private clearBuffer;
+    private asDecryptionError;
     private fail;
 }

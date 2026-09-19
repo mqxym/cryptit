@@ -3,6 +3,7 @@ import { HEADER_START_BYTE, HEADER_STREAM_AUTH_BIT } from './constants.js';
 import { concat } from '../util/bytes.js';
 import { EncryptionAlgorithm } from '../types/index.js';
 import type { StreamFormat } from '../util/frame.js';
+import { SchemeRegistry } from '../config/SchemeRegistry.js';
 
 export function encodeHeader(
   scheme: number,
@@ -15,6 +16,20 @@ export function encodeHeader(
   const diffMap = { low: 0, middle: 1, high: 2 } as const;
   if (!(difficulty in diffMap))
     throw new TypeError(`Unsupported difficulty: ${difficulty}`);
+  if (saltStrength !== 'low' && saltStrength !== 'high') {
+    throw new TypeError(`Unsupported salt strength: ${saltStrength}`);
+  }
+  if (streamFormat !== 'legacy' && streamFormat !== 'authenticated-v1') {
+    throw new TypeError(`Unsupported stream format: ${streamFormat}`);
+  }
+
+  const descriptor = SchemeRegistry.get(scheme);
+  const expectedSaltLength = descriptor.saltLengths[saltStrength];
+  if (!(salt instanceof Uint8Array) || salt.length !== expectedSaltLength) {
+    throw new TypeError(
+      `Scheme ${scheme} ${saltStrength} salt must be ${expectedSaltLength} bytes`,
+    );
+  }
 
   const diffCode = diffMap[difficulty];
   const infoByte =
