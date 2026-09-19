@@ -40,6 +40,13 @@ import {
 } from './errors/index.js';
 
 import { EngineManager, type Engine } from './engine/EngineManager.js';
+import {
+  decodeStreamRecord,
+  FRAME_HEADER_BYTES,
+  MAX_CIPHER_FRAME_SIZE,
+  MAX_PLAINTEXT_CHUNK_SIZE,
+  type StreamFormat,
+} from './util/frame.js';
 
 // ────────────────────────────────────────────────────────────────────────────
 //  Public configuration shape
@@ -69,6 +76,10 @@ export interface CryptitOptions {
   difficulty?   : Difficulty;
   /** Chunk size for streaming operations; defaults to descriptor's default */
   chunkSize?    : number;
+  /** Framing used for new file/stream ciphertext; defaults to authenticated-v1 */
+  streamFormat? : StreamFormat;
+  /** Highest KDF difficulty accepted from ciphertext headers; defaults to high */
+  maxDecryptionDifficulty? : Difficulty;
   /** Enable legacy file and text decryption version < 1.0.0 */
   acceptUnauthenticatedHeader?    : boolean;
   /** Verbosity level 0-4 for logging (0 = errors only) */
@@ -78,7 +89,7 @@ export interface CryptitOptions {
 }
 
 export type DecodeDataResult =
-  | { isChunked: true;  chunks: { chunkSize: number; count: number; totalPayload: number } }
+  | { isChunked: true; format: StreamFormat; authenticated: boolean; chunks: { chunkSize: number; count: number; totalPayload: number } }
   | { isChunked: false; payloadLength: number; params: { iv: Uint8Array; ivLength: number; tag: Uint8Array; tagLength: number } };
 
 /**
@@ -91,6 +102,8 @@ export class Cryptit {
   private kdf        : KeyDerivation;
   private chunkSize  : number;
   private stream     : StreamProcessor;
+  private streamFormat: StreamFormat;
+  private maxDecryptionDifficulty: Difficulty;
 
   private acceptUnauthenticatedHeader: boolean;
 
@@ -116,6 +129,8 @@ export class Cryptit {
     this.kdf        = this.v.kdf;
     this.chunkSize  = this.setChunkSize(opt.chunkSize ?? this.v.defaultChunkSize);
     this.stream     = new StreamProcessor(this.cipher, this.chunkSize);
+    this.streamFormat = opt.streamFormat ?? 'authenticated-v1';
+    this.maxDecryptionDifficulty = opt.maxDecryptionDifficulty ?? 'high';
 
     this.difficulty     = opt.difficulty   ?? 'middle';
     this.saltStrength   = opt.saltStrength ?? 'high';
@@ -209,7 +224,7 @@ export class Cryptit {
     : new ByteSource(input);
     const headSlice = await src.read(0, Math.min(256, src.length));
     const header    = await Cryptit.peekHeader(headSlice);
-    const { scheme, headerLen } = decodeHeader(header);
+    const { scheme, headerLen, streamFormat } = decodeHeader(header);
 
     // Compute remaining payload length
     const totalLen  = src.length;
@@ -218,9 +233,63 @@ export class Cryptit {
       throw new InvalidHeaderError('Payload underflow');
     }
     if (remain === 0) {
+      if (streamFormat === 'authenticated-v1') {
+        throw new InvalidHeaderError('Authenticated stream is missing its terminator');
+      }
       return {
         isChunked: true,
+        format: 'legacy',
+        authenticated: false,
         chunks: { chunkSize: 0, count: 0, totalPayload: 0 },
+      } as const;
+    }
+
+    if (streamFormat === 'authenticated-v1') {
+      const desc = SchemeRegistry.get(scheme);
+      const minFrame = desc.cipher.IV_LENGTH + desc.cipher.TAG_LENGTH;
+      let offset = headerLen;
+      let count = 0;
+      let total = 0;
+      let chunkSize = 0;
+      let terminalSeen = false;
+
+      while (offset < totalLen) {
+        if (totalLen - offset < FRAME_HEADER_BYTES) {
+          throw new InvalidHeaderError('Truncated authenticated stream record');
+        }
+        const record = decodeStreamRecord(await src.read(offset, FRAME_HEADER_BYTES));
+        if (record.length < minFrame || record.length > MAX_CIPHER_FRAME_SIZE) {
+          throw new InvalidHeaderError(`Invalid authenticated stream record length: ${record.length}`);
+        }
+        const recordEnd = offset + FRAME_HEADER_BYTES + record.length;
+        if (recordEnd > totalLen) {
+          throw new InvalidHeaderError('Truncated authenticated stream record');
+        }
+        if (terminalSeen) {
+          throw new InvalidHeaderError('Data found after authenticated stream terminator');
+        }
+
+        if (record.terminal) {
+          if (record.length !== minFrame) {
+            throw new InvalidHeaderError('Invalid authenticated stream terminator length');
+          }
+          terminalSeen = true;
+        } else {
+          if (count === 0) chunkSize = record.length;
+          count++;
+          total += record.length;
+        }
+        offset = recordEnd;
+      }
+
+      if (!terminalSeen) {
+        throw new InvalidHeaderError('Authenticated stream is missing its terminator');
+      }
+      return {
+        isChunked: true,
+        format: 'authenticated-v1',
+        authenticated: true,
+        chunks: { chunkSize, count, totalPayload: total },
       } as const;
     }
 
@@ -251,6 +320,8 @@ export class Cryptit {
 
       return {
         isChunked: true,
+        format: 'legacy',
+        authenticated: false,
         chunks: {
           chunkSize,
           count,
@@ -317,7 +388,7 @@ export class Cryptit {
    */
   setChunkSize(bytes: number): number {
      
-      const MAX_ALLOWED_CHUNK_SIZE = 128 * 1024 * 1024; // 128 MiB
+      const MAX_ALLOWED_CHUNK_SIZE = MAX_PLAINTEXT_CHUNK_SIZE;
       const rawSize = bytes;
       let size: number;
 
@@ -375,37 +446,37 @@ export class Cryptit {
     if (pass === null) throw new EncryptionError("Password can't be null");
  
     const secret = { value: pass };
+    const desc = this.v;
+    const difficulty = this.difficulty;
+    const saltStrength = this.saltStrength;
+    const engine = EngineManager.getEngine(this.provider, desc.id);
+    let inp: ConvertibleInput | null = null;
 
     try {
       if (pass === '') this.log.log(0, 'Empty passphrase provided to encryptText');
-      this.log.log(1, `Start text encryption, scheme: ${this.getScheme()}`);
+      this.log.log(1, `Start text encryption, scheme: ${desc.id}`);
 
       // Normalize input once; we’ll wipe after use
-      const inp = ConvertibleInput.from(plain);
+      inp = ConvertibleInput.from(plain);
       const plainBytes = inp.toUint8Array();
 
       this.log.log(2, 'Deriving key for text encryption');
-      const salt = this.genSalt();
-      await this.deriveKey(secret, salt);
+      const salt = this.provider.getRandomValues(
+        new Uint8Array(desc.saltLengths[saltStrength]),
+      );
+      await EngineManager.deriveKey(engine, secret, salt, difficulty);
 
-      zeroizeString(secret);
-      pass = null;
-
-      this.log.log(3, `Salt generated: ${base64Encode(salt)}, KDF difficulty: ${this.difficulty}`);
+      this.log.log(3, `Salt generated: ${base64Encode(salt)}, KDF difficulty: ${difficulty}`);
       this.log.log(3, 'Encoding header');
 
-      const header = encodeHeader(this.v.id, this.difficulty, this.saltStrength, salt, this.cipher);
+      const header = encodeHeader(desc.id, difficulty, saltStrength, salt, engine.cipher);
 
-      this.cipher.setPaddingScheme(new Magic48VerCrc8Padding());
-      this.cipher.setPaddingAlign(8);
-      this.cipher.setPaddingAADMode('require');
+      engine.cipher.setPaddingScheme(new Magic48VerCrc8Padding());
+      engine.cipher.setPaddingAlign(8);
+      engine.cipher.setPaddingAADMode('require');
 
       this.log.log(2, 'Encrypting text data');
-      const cipher = await this.cipher.encryptChunk(plainBytes);
-      this.cipher.zeroKey();
-
-      // wipe plaintext ASAP
-      try { inp.clear(); } catch {}
+      const cipher = await engine.cipher.encryptChunk(plainBytes);
 
       // Return a convertible output over the raw container bytes (header + cipher)
       const container = concat(header, cipher);
@@ -417,6 +488,11 @@ export class Cryptit {
         err instanceof Error ? err.message : String(err),
         { cause: err },
       );
+    } finally {
+      engine.cipher.zeroKey();
+      zeroizeString(secret);
+      pass = null;
+      try { inp?.clear(); } catch {}
     }
   }
 
@@ -435,6 +511,7 @@ export class Cryptit {
     if (pass === null) throw new DecryptionError("Password can't be null");
  
     const secret = { value: pass };
+    let engine: Engine | null = null;
 
     try {
       if (pass === '') this.log.log(0, 'Empty passphrase provided to decryptText');
@@ -457,10 +534,11 @@ export class Cryptit {
       const hdr = decodeHeader(container);
 
       this.log.log(3, 'Selecting decryption engine');
-      const engine = EngineManager.getEngine(this.provider, hdr.scheme);
+      engine = EngineManager.getEngine(this.provider, hdr.scheme);
 
       this.log.log(2, `Deriving key via engine for scheme: ${hdr.scheme}`);
       this.log.log(3, `Salt use: ${base64Encode(hdr.salt)}, KDF difficulty: ${hdr.difficulty}`);
+      this.assertDecryptionDifficulty(hdr.difficulty);
 
       try {
         await EngineManager.deriveKey(engine, secret, hdr.salt, hdr.difficulty);
@@ -479,8 +557,6 @@ export class Cryptit {
       const plainBytes = await engine.cipher.decryptChunk(
         container.slice(hdr.headerLen),
       );
-      engine.cipher.zeroKey();
-
       // if input was a ConvertibleInput, wipe it
       if (data instanceof ConvertibleInput) {
         try { data.clear(); } catch {}
@@ -502,6 +578,10 @@ export class Cryptit {
         'Decryption failed: wrong passphrase or corrupted ciphertext',
         { cause: err },
       );
+    } finally {
+      engine?.cipher.zeroKey();
+      zeroizeString(secret);
+      pass = null;
     }
   }
 
@@ -520,38 +600,53 @@ export class Cryptit {
     if (pass === null) throw new EncryptionError("Password can't be null");
  
     const secret = { value: pass };
+    const desc = this.v;
+    const difficulty = this.difficulty;
+    const saltStrength = this.saltStrength;
+    const chunkSize = this.chunkSize;
+    const streamFormat = this.streamFormat;
+    const engine = EngineManager.getEngine(this.provider, desc.id);
     try {
 
-      if (file.size === 0) {
-        const salt = this.genSalt();
-        await this.deriveKey(secret, salt);
-
-        zeroizeString(secret);
-        pass = null;
+      if (file.size === 0 && streamFormat === 'legacy') {
+        const salt = this.provider.getRandomValues(
+          new Uint8Array(desc.saltLengths[saltStrength]),
+        );
+        await EngineManager.deriveKey(engine, secret, salt, difficulty);
 
         const header = encodeHeader(
-          this.v.id,
-          this.difficulty,
-          this.saltStrength,
+          desc.id,
+          difficulty,
+          saltStrength,
           salt,
         );
         /* nothing to encrypt ⇒ header alone is a valid container */
         return new Blob([header as BufferSource], { type: 'application/octet-stream' });
       }
       this.log.log(2, 'Deriving key for file encryption');
-      const salt = this.genSalt();
-      await this.deriveKey(secret, salt);
+      const salt = this.provider.getRandomValues(
+        new Uint8Array(desc.saltLengths[saltStrength]),
+      );
+      await EngineManager.deriveKey(engine, secret, salt, difficulty);
 
-      zeroizeString(secret);
-      pass = null;
+      const header = encodeHeader(
+        desc.id,
+        difficulty,
+        saltStrength,
+        salt,
+        engine.cipher,
+        streamFormat,
+      );
 
-      const header = encodeHeader(this.v.id, this.difficulty, this.saltStrength, salt, this.stream.getEngine());
+      engine.cipher.setPaddingAADMode('forbid');
+      const stream = new StreamProcessor(engine.cipher, chunkSize);
 
-      this.stream.getEngine().setPaddingAADMode('forbid');
-
-      const cipher = await this.stream.collect(
+      const cipher = await stream.collect(
         file.stream() as ReadableStream<Uint8Array>,
-        new EncryptTransform(this.cipher, this.chunkSize).toTransformStream(),
+        new EncryptTransform(engine.cipher, chunkSize, {
+          format: streamFormat,
+          header,
+        }).toTransformStream(),
         header,
       );
 
@@ -562,6 +657,10 @@ export class Cryptit {
         err instanceof Error ? err.message : String(err),
         { cause: err },
       );
+    } finally {
+      engine.cipher.zeroKey();
+      zeroizeString(secret);
+      pass = null;
     }
   }
 
@@ -581,10 +680,12 @@ export class Cryptit {
  
 
     const secret = { value: pass };
+    let engine: Engine | null = null;
     try {
       const header = await Cryptit.peekHeader(file);
       const parsed = decodeHeader(header);
-      const engine = EngineManager.getEngine(this.provider, parsed.scheme);
+      engine = EngineManager.getEngine(this.provider, parsed.scheme);
+      this.assertDecryptionDifficulty(parsed.difficulty);
       
 
       try {
@@ -595,7 +696,7 @@ export class Cryptit {
       }
 
       // ── 0-byte optimisation ────────────────────────────────────────
-      if (file.size === parsed.headerLen) {
+      if (file.size === parsed.headerLen && parsed.streamFormat === 'legacy') {
         /* container carries header only - nothing to decrypt */
         return new Blob([], { type: 'application/octet-stream' });
       }
@@ -605,10 +706,17 @@ export class Cryptit {
       // again for correc tdata
       decodeHeader(header, streamProc.getEngine());
       engine.cipher.setPaddingAADMode('forbid');
-      engine.cipher.setLegacyAADFallback({ enabled: true, policy: 'auto', tryEmptyAAD: this.acceptUnauthenticatedHeader ? true : false });
+      engine.cipher.setLegacyAADFallback({
+        enabled: parsed.streamFormat === 'legacy',
+        policy: 'auto',
+        tryEmptyAAD: parsed.streamFormat === 'legacy' && this.acceptUnauthenticatedHeader,
+      });
       const plain = await streamProc.collect(
         file.slice(parsed.headerLen).stream() as ReadableStream<Uint8Array>,
-        new DecryptTransform(engine.cipher, engine.chunkSize).toTransformStream(),
+        new DecryptTransform(engine.cipher, engine.chunkSize, {
+          format: parsed.streamFormat,
+          header,
+        }).toTransformStream(),
       );
 
       return new Blob([plain as BufferSource], { type: 'application/octet-stream' });
@@ -619,6 +727,10 @@ export class Cryptit {
         err instanceof Error ? err.message : String(err),
         { cause: err },
       );
+    } finally {
+      engine?.cipher.zeroKey();
+      zeroizeString(secret);
+      pass = null;
     }
   }
 
@@ -635,19 +747,40 @@ export class Cryptit {
     if (pass === null) throw new EncryptionError("Password can't be null");
  
     const secret = { value: pass };
+    const desc = this.v;
+    const difficulty = this.difficulty;
+    const saltStrength = this.saltStrength;
+    const chunkSize = this.chunkSize;
+    const streamFormat = this.streamFormat;
+    const engine = EngineManager.getEngine(this.provider, desc.id);
 
-    this.log.log(2, 'Deriving key for stream encryption');
-    const salt = this.genSalt();
-    await this.deriveKey(secret, salt);
+    try {
+      this.log.log(2, 'Deriving key for stream encryption');
+      const salt = this.provider.getRandomValues(
+        new Uint8Array(desc.saltLengths[saltStrength]),
+      );
+      await EngineManager.deriveKey(engine, secret, salt, difficulty);
 
-    zeroizeString(secret);
-    pass = null;
+      const header = encodeHeader(
+        desc.id,
+        difficulty,
+        saltStrength,
+        salt,
+        engine.cipher,
+        streamFormat,
+      );
+      engine.cipher.setPaddingAADMode('forbid');
+      const stream = new StreamProcessor(engine.cipher, chunkSize);
+      const tf = stream.encryptionStream({ format: streamFormat, header });
 
-    const header = encodeHeader(this.v.id, this.difficulty, this.saltStrength, salt, this.stream.getEngine());
-    this.stream.getEngine().setPaddingAADMode('forbid');
-    const tf     = this.stream.encryptionStream();
-
-    return { header, writable: tf.writable, readable: tf.readable };
+      return { header, writable: tf.writable, readable: tf.readable };
+    } catch (err) {
+      engine.cipher.zeroKey();
+      throw err;
+    } finally {
+      zeroizeString(secret);
+      pass = null;
+    }
   }
 
   /* ──────────────────────────────────────────────────────────
@@ -748,6 +881,13 @@ export class Cryptit {
           // Initialize engine and derive key
           const engine = EngineManager.getEngine(provider, parsed.scheme);
           try {
+            this.assertDecryptionDifficulty(parsed.difficulty);
+          } catch (err) {
+            zeroizeString(secret);
+            ctl.error(err instanceof Error ? err : new DecryptionError('KDF policy rejected ciphertext'));
+            return;
+          }
+          try {
             await EngineManager.deriveKey(engine, secret, parsed.salt, parsed.difficulty);
           } finally {
             zeroizeString(secret);
@@ -758,13 +898,16 @@ export class Cryptit {
           decodeHeader(headerBytes, engine.cipher);
           engine.cipher.setPaddingAADMode('forbid');
           engine.cipher.setLegacyAADFallback({
-            enabled: true,
+            enabled: parsed.streamFormat === 'legacy',
             policy: 'auto',
-            tryEmptyAAD: this.acceptUnauthenticatedHeader ? true : false,
+            tryEmptyAAD: parsed.streamFormat === 'legacy' && this.acceptUnauthenticatedHeader,
           });
 
           // Build downstream using WRITER's chunkSize from the header/engine
-          downstream = new DecryptTransform(engine.cipher, engine.chunkSize).toTransformStream();
+          downstream = new DecryptTransform(engine.cipher, engine.chunkSize, {
+            format: parsed.streamFormat,
+            header: headerBytes,
+          }).toTransformStream();
           void pipeOut(downstream.readable, ctl).catch(err => ctl.error(err));
 
           // Immediately forward remainder of buffered data + any tail from this chunk
@@ -880,6 +1023,15 @@ export class Cryptit {
   private genSalt<S extends SaltStrength>(strength: S = this.saltStrength as S): Uint8Array {
     const len = this.v.saltLengths[strength];
     return this.provider.getRandomValues(new Uint8Array(len));
+  }
+
+  private assertDecryptionDifficulty(difficulty: Difficulty): void {
+    const rank: Record<Difficulty, number> = { low: 0, middle: 1, high: 2 };
+    if (rank[difficulty] > rank[this.maxDecryptionDifficulty]) {
+      throw new DecryptionError(
+        `Ciphertext KDF difficulty '${difficulty}' exceeds configured maximum '${this.maxDecryptionDifficulty}'`,
+      );
+    }
   }
 
   // ────────────────────────────────────────────────────────────────────

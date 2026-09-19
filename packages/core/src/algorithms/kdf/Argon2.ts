@@ -29,14 +29,17 @@ export class Argon2KDF implements KeyDerivation<'low' | 'middle' | 'high'> {
       provider.isNode ? 'node' : 'browser'
     );
 
-    const rawKey = asArrayBufferView(hash);
-
-    return provider.subtle.importKey(
-      'raw',
-      rawKey,
-      { name: 'AES-GCM', length: 256 },
-      this.exportExtractable,
-      ['encrypt', 'decrypt']
-    );
+    try {
+      const rawKey = asArrayBufferView(hash);
+      return await provider.subtle.importKey(
+        'raw',
+        rawKey,
+        { name: 'AES-GCM', length: 256 },
+        this.exportExtractable,
+        ['encrypt', 'decrypt']
+      );
+    } finally {
+      hash.fill(0);
+    }
   }
 }

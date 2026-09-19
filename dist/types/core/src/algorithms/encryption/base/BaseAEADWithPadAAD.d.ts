@@ -233,6 +233,7 @@ export declare abstract class BaseAEADWithPadAAD implements EncryptionAlgorithm 
      * - When no {@link PaddingScheme} is configured, only `'require'` can fail.
      */
     protected enforcePolicyAfterDecrypt(plain: Uint8Array, mode: PaddingAADMode): Uint8Array;
+    private enforceAndWipeOnError;
     /**
      * Import or set the cipher key. Subclasses decide the key format (e.g., CryptoKey
      * for WebCrypto algorithms, exported raw key for libraries that require it).

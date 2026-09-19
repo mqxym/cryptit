@@ -1,4 +1,9 @@
 import type { EncryptionAlgorithm } from '../types/index.js';
+import { type StreamFormat } from '../util/frame.js';
+export interface EncryptTransformOptions {
+    format?: StreamFormat;
+    header?: Uint8Array;
+}
 /**
  * TransformStream that:
  *   • collects plaintext into fixed‐size blocks
@@ -15,8 +20,12 @@ export declare class EncryptTransform {
     private readonly engine;
     private readonly chunkSize;
     private buffer;
-    constructor(engine: EncryptionAlgorithm, chunkSize?: number);
+    private recordIndex;
+    private readonly format;
+    private readonly header;
+    constructor(engine: EncryptionAlgorithm, chunkSize?: number, options?: EncryptTransformOptions);
     toTransformStream(): TransformStream<Uint8Array | ArrayBuffer | Blob, Uint8Array>;
     private transform;
     private flush;
+    private emitRecord;
 }

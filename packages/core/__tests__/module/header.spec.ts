@@ -19,6 +19,18 @@ describe('header encode/decode', () => {
     broken[0] = 0xFF;
     expect(() => decodeHeader(broken)).toThrow(InvalidHeaderError);
   });
+
+  it('rejects unsupported reserved header flags', () => {
+    const header = encodeHeader(0, 'low', 'low', new Uint8Array(12));
+    header[1] |= 0x10;
+    expect(() => decodeHeader(header)).toThrow();
+  });
+
+  it('rejects the unassigned difficulty code', () => {
+    const header = encodeHeader(0, 'low', 'low', new Uint8Array(12));
+    header[1] = (header[1] & 0xfc) | 0x03;
+    expect(() => decodeHeader(header)).toThrow();
+  });
 });
 
 import { HeaderDecodeError } from '../../src/errors/index.js';               // NEW

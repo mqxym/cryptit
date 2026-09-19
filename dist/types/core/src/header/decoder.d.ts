@@ -5,4 +5,5 @@ export declare function decodeHeader(buf: Uint8Array, cipher?: EncryptionAlgorit
     saltStrength: "low" | "high";
     salt: Uint8Array<ArrayBuffer>;
     headerLen: number;
+    streamFormat: "legacy" | "authenticated-v1";
 };

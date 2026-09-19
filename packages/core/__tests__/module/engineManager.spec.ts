@@ -2,13 +2,14 @@ import { EngineManager } from '../../src/engine/EngineManager.js';
 import { nodeProvider }  from '../../../node-runtime/src/provider.js';
 
 describe('EngineManager', () => {
-  it('caches engines per scheme', () => {
+  it('returns an isolated mutable engine for every operation', () => {
     const e1 = EngineManager.getEngine(nodeProvider, 0);
     const e2 = EngineManager.getEngine(nodeProvider, 0);
-    expect(e1).toBe(e2);
+    expect(e1).not.toBe(e2);
+    expect(e1.cipher).not.toBe(e2.cipher);
   });
 
-  it('caches engines per provider instance only', () => {
+  it('does not share engines across provider instances', () => {
     const otherProvider = { ...nodeProvider }; // new identity
     const e1 = EngineManager.getEngine(nodeProvider, 0);
     const e2 = EngineManager.getEngine(otherProvider as any, 0);

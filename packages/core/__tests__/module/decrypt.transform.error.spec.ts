@@ -2,6 +2,7 @@ import { DecryptTransform } from '../../src/stream/DecryptTransform.js';
 import type { EncryptionAlgorithm } from '../../src/types/index.js';
 import { DecryptionError } from '../../src/errors/index.js';
 import { collectStream as collect } from '../../src/util/stream.js';
+import { MAX_CIPHER_FRAME_SIZE } from '../../src/util/frame.js';
 
 /*  Naïve “no-op” engine - just echoes data back  */
 class NopEngine implements EncryptionAlgorithm {
@@ -20,7 +21,7 @@ describe('DecryptTransform  frame-length guard-rails', () => {
     const engine = new NopEngine();
     const ts = new DecryptTransform(engine, 8).toTransformStream();
 
-    const HARD_CAP_PLUS_ONE = 64 * 1024 * 1024 + 1; // 64 MiB + 1
+    const HARD_CAP_PLUS_ONE = MAX_CIPHER_FRAME_SIZE + 1;
     const hdr = new Uint8Array(4);
     new DataView(hdr.buffer).setUint32(0, HARD_CAP_PLUS_ONE, false); // big-endian
 

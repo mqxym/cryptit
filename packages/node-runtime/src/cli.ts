@@ -1,18 +1,21 @@
 #!/usr/bin/env node
 // packages/node-runtime/src/cli.ts
 import { Command, Option } from 'commander';
-import { existsSync, accessSync, constants as fsConstants, realpathSync} from 'node:fs';
+import { existsSync, promises as fsp, realpathSync } from 'node:fs';
 import { createReadStream, createWriteStream } from 'node:fs';
 import { stdin, stdout, stderr, exit as processExit } from 'node:process';
+import { randomUUID } from 'node:crypto';
+import type { Writable } from 'node:stream';
+import { finished } from 'node:stream/promises';
 import { FilesystemError } from '../../core/src/errors/index.js';
 import { FileByteSource } from '../../core/src/util/ByteSource.js';
 import { createCryptit } from './index.js';
 import { Cryptit } from '../../core/src/index.js';
-import { dirname , resolve, sep, isAbsolute} from 'node:path';
+import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { toWebReadable, toWebWritable } from './streamAdapter.js';
 
 
-const PKG_VERSION = '2.2.9'; // sync with root package.json
+const PKG_VERSION = '2.4.0'; // sync with root package.json
 
 const DEFAULT_ROOT = process.cwd();
 
@@ -45,44 +48,118 @@ async function promptPass(): Promise<string> {
   });
 }
 
+type PassOptions = { pass?: string; passFile?: string };
+
+function redactPassArg(secret: string): void {
+  for (let index = 1; index < process.argv.length; index++) {
+    if (
+      process.argv[index] === secret &&
+      (process.argv[index - 1] === '--pass' || process.argv[index - 1] === '-p')
+    ) {
+      process.argv[index] = '[REDACTED]';
+    }
+  }
+}
+
+async function resolvePassphrase(
+  options: PassOptions,
+  canPrompt: boolean,
+): Promise<string> {
+  if (options.pass !== undefined && options.passFile !== undefined) {
+    throw new Error('Use either --pass or --pass-file, not both');
+  }
+  if (options.pass !== undefined) {
+    redactPassArg(options.pass);
+    return options.pass;
+  }
+  if (options.passFile !== undefined) {
+    const stat = await fsp.stat(options.passFile);
+    const maxBytes = 64 * 1024;
+    if (!stat.isFile() || stat.size > maxBytes) {
+      throw new Error(`Passphrase file must be a regular file no larger than ${maxBytes} bytes`);
+    }
+    const value = (await fsp.readFile(options.passFile, 'utf8')).replace(/\r?\n$/, '');
+    if (!value) throw new Error('Passphrase file cannot be empty');
+    return value;
+  }
+  if (canPrompt) return promptPass();
+  throw new Error('Use --pass-file or --pass when piping via STDIN');
+}
 
 
-function assertWritable(out: string, root: string = DEFAULT_ROOT) {
-  if (out === '-') return;
 
-  const absRoot   = realpathSync(root);
+interface OutputTransaction {
+  stream: Writable;
+  commit(): Promise<void>;
+  rollback(): Promise<void>;
+}
 
-  const absOut    = isAbsolute(out)
-                  ? resolve(out)
-                  : resolve(absRoot, out);
+async function openOutputTransaction(
+  out: string,
+  root: string = DEFAULT_ROOT,
+): Promise<OutputTransaction> {
+  if (out === '-') {
+    return {
+      stream: stdout,
+      async commit() {},
+      async rollback() {},
+    };
+  }
 
+  const absRoot = realpathSync(root);
+  const absOut = isAbsolute(out) ? resolve(out) : resolve(absRoot, out);
   const targetDir = dirname(absOut);
-
   if (!existsSync(targetDir)) {
     throw new FilesystemError(`Output directory does not exist: ${targetDir}`);
   }
 
   const realTarget = realpathSync(targetDir);
-
-  if (!realTarget.startsWith(absRoot + sep)) {
+  const fromRoot = relative(absRoot, realTarget);
+  if (fromRoot === '..' || fromRoot.startsWith(`..${sep}`) || isAbsolute(fromRoot)) {
     throw new FilesystemError('Refusing to write outside of root directory.');
   }
 
-  if (!realTarget.startsWith(absRoot + sep)) {
-    throw new FilesystemError('Refusing to write outside of root directory.');
-  }
-  if (!existsSync(targetDir)) {
-    throw new FilesystemError(`Output directory does not exist: ${targetDir}`);
-  }
+  const tempPath = resolve(
+    realTarget,
+    `.${basename(absOut)}.cryptit-tmp-${randomUUID()}`,
+  );
+  const stream = createWriteStream(tempPath, { flags: 'wx', mode: 0o600 });
+  await new Promise<void>((resolveOpen, rejectOpen) => {
+    const onOpen = () => {
+      stream.off('error', onError);
+      resolveOpen();
+    };
+    const onError = (err: Error) => {
+      stream.off('open', onOpen);
+      rejectOpen(err);
+    };
+    stream.once('open', onOpen);
+    stream.once('error', onError);
+  });
 
-  try {
-    accessSync(targetDir, fsConstants.W_OK);
-  } catch {
-    throw new FilesystemError(`Output directory is not writeable`);
-  }
-  
-
-  return absOut;
+  let settled = false;
+  return {
+    stream,
+    async commit() {
+      if (settled) return;
+      await finished(stream);
+      try {
+        await fsp.rename(tempPath, absOut);
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code;
+        if (code !== 'EEXIST' && code !== 'EPERM') throw err;
+        await fsp.unlink(absOut);
+        await fsp.rename(tempPath, absOut);
+      }
+      settled = true;
+    },
+    async rollback() {
+      if (settled) return;
+      settled = true;
+      stream.destroy();
+      await fsp.rm(tempPath, { force: true }).catch(() => {});
+    },
+  };
 }
 
 async function readAllFromStdin(): Promise<string> {
@@ -120,6 +197,10 @@ program
         if (!v.trim()) throw new Error('Passphrase cannot be empty');
         return v;
       })
+  )
+
+  .addOption(
+    new Option('--pass-file <file>', 'read passphrase from a bounded file')
   )
 
   // difficulty
@@ -187,7 +268,6 @@ process.on('unhandledRejection', (err: unknown) => {
 /*  Decode command (stream-safe)                                       */
 /* ------------------------------------------------------------------ */
 ;
-import { promises as fsp } from 'fs';
 import * as os   from 'os';
 import * as path from 'path';
 
@@ -327,35 +407,35 @@ program
     /* -------------------------------------------------------------- */
     if (useStdin) {
       const tmpPath = await stdinToTempFile();
-      const fileSrc = await FileByteSource.open(tmpPath);
-
       try {
-        /* Attempt to parse as raw Cryptit binary first */
+        const fileSrc = await FileByteSource.open(tmpPath);
         try {
-          const meta = await decodeFromSource(fileSrc);
-          stdout.write(JSON.stringify(meta, null, 2) + '\n');
-          return;
-        } catch {
-          /* fall through - maybe it’s Base-64 text */
+          try {
+            const meta = await decodeFromSource(fileSrc);
+            stdout.write(JSON.stringify(meta, null, 2) + '\n');
+            return;
+          } catch {
+            /* fall through - maybe it’s Base-64 text */
+          }
+        } finally {
+          await fileSrc.close();
         }
+
+        const text = (await fsp.readFile(tmpPath, { encoding: 'utf8' })).trim();
+
+        const isB64 = /^[A-Za-z0-9+/]+={0,2}$/.test(text) && text.length % 4 === 0;
+        if (!isB64) {
+          stderr.write('Error: Input neither valid Cryptit binary nor Base-64 text\n');
+          processExit(1);
+        }
+
+        const data = Buffer.from(text, 'base64');
+        const meta = await decodeBinary(new Uint8Array(data));
+        stdout.write(JSON.stringify(meta, null, 2) + '\n');
+        return;
       } finally {
-        await fileSrc.close();
+        await fsp.rm(dirname(tmpPath), { recursive: true, force: true }).catch(() => {});
       }
-
-      /* Reload temp file as UTF-8 text and attempt Base-64 path */
-      const text = (await fsp.readFile(tmpPath, { encoding: 'utf8' })).trim();
-      await fsp.unlink(tmpPath);
-
-      const isB64 = /^[A-Za-z0-9+/]+={0,2}$/.test(text) && text.length % 4 === 0;
-      if (!isB64) {
-        stderr.write('Error: Input neither valid Cryptit binary nor Base-64 text\n');
-        processExit(1);
-      }
-
-      const data = Buffer.from(text, 'base64');
-      const meta = await decodeBinary(new Uint8Array(data));
-      stdout.write(JSON.stringify(meta, null, 2) + '\n');
-      return;
     }
 
     /* -------------------------------------------------------------- */
@@ -399,38 +479,36 @@ program
       verbose: opts.verbose,
       scheme: opts.scheme,
     });
-    const pass =
-      opts.pass ??
-      (stdin.isTTY ? await promptPass() : (() => {
-        stderr.write('Use --pass when piping via STDIN\n');
-        processExit(1);
-      })());
+    const pass = await resolvePassphrase(opts, stdin.isTTY);
     
 
+    let output: OutputTransaction;
     try {
-      assertWritable(cmd.out);
+      output = await openOutputTransaction(cmd.out);
     } catch (err: any) {
       stderr.write(`Error: ${err.message}\n`);
       processExit(1);
     }
 
     const inStream  = src  === '-' ? stdin  : createReadStream(src);
-    const outStream = cmd.out === '-' ? stdout : createWriteStream(cmd.out);
+    try {
+      const { header, writable, readable } = await crypt.createEncryptionStream(pass);
+      const webIn  = toWebReadable(inStream);
+      const webOut = toWebWritable(output.stream);
 
-    const { header, writable, readable } = await crypt.createEncryptionStream(pass);
-    const webIn  = toWebReadable(inStream);
-    const webOut = toWebWritable(outStream);
+      const w = webOut.getWriter();
+      await w.write(header);
+      w.releaseLock();
 
-    // 1) Write header
-    const w = webOut.getWriter();
-    await w.write(header);
-    w.releaseLock();
-
-    // 2) Pipe the rest
-    await Promise.all([
-      webIn.pipeTo(writable),
-      readable.pipeTo(webOut),
-    ]);
+      await Promise.all([
+        webIn.pipeTo(writable),
+        readable.pipeTo(webOut),
+      ]);
+      await output.commit();
+    } catch (err) {
+      await output.rollback();
+      throw err;
+    }
   });
 
 program
@@ -456,26 +534,31 @@ program
       acceptUnauthenticatedHeader: cmd.legacy,
     });
 
+    let output: OutputTransaction;
     try {
-      assertWritable(cmd.out);
+      output = await openOutputTransaction(cmd.out);
     } catch (err: any) {
       stderr.write(`Error: ${err.message}\n`);
       processExit(1);
     }
 
 
-    const pass = opts.pass ?? await promptPass();
+    const pass = await resolvePassphrase(opts, stdin.isTTY);
     const inStream  = src  === '-' ? stdin  : createReadStream(src);
-    const outStream = cmd.out === '-' ? stdout : createWriteStream(cmd.out);
+    try {
+      const webIn  = toWebReadable(inStream);
+      const webOut = toWebWritable(output.stream);
+      const ts     = await crypt.createDecryptionStream(pass);
 
-    const webIn  = toWebReadable(inStream);
-    const webOut = toWebWritable(outStream);
-    const ts     = await crypt.createDecryptionStream(pass);
-
-    await Promise.all([
-      webIn.pipeTo(ts.writable),
-      ts.readable.pipeTo(webOut),
-    ]);
+      await Promise.all([
+        webIn.pipeTo(ts.writable),
+        ts.readable.pipeTo(webOut),
+      ]);
+      await output.commit();
+    } catch (err) {
+      await output.rollback();
+      throw err;
+    }
   });
 
 program
@@ -490,12 +573,7 @@ program
       verbose: opts.verbose,
       scheme: opts.scheme,
     });
-    const pass =
-      opts.pass ??
-      (stdin.isTTY ? await promptPass() : (() => {
-        stderr.write('Use --pass when piping via STDIN\n');
-        processExit(1);
-      })());
+    const pass = await resolvePassphrase(opts, stdin.isTTY);
     const plain = text ?? (await readAllFromStdin());
     const cipher = await crypt.encryptText(plain, pass);
     stdout.write(cipher.base64 + '\n');
@@ -515,7 +593,7 @@ program
       scheme: opts.scheme,
       acceptUnauthenticatedHeader: options.legacy,
     });
-    const pass = opts.pass ?? await promptPass();
+    const pass = await resolvePassphrase(opts, stdin.isTTY);
     const data = b64 ?? (await readAllFromStdin()).trim();
     if (!/^[A-Za-z0-9+/]+={0,2}$/.test(data)) {
       stderr.write('Error: ciphertext does not look like Base64\n');
@@ -547,9 +625,9 @@ program
       scheme: opts.scheme,
     });
 
-    // Prepare destination
+    let output: OutputTransaction;
     try {
-      assertWritable(cmd.out);
+      output = await openOutputTransaction(cmd.out);
     } catch (err: any) {
       stderr.write(`Error: ${err.message}\n`);
       processExit(1);
@@ -559,22 +637,22 @@ program
     const data = crypt.generateFakeData(len, cmd.usePadding);
     const buf  = Buffer.from(data);
 
-    // Write output
-    if (cmd.base64) {
-      const b64 = buf.toString('base64') + '\n';
+    const payload = cmd.base64
+      ? Buffer.from(buf.toString('base64') + '\n', 'utf8')
+      : buf;
+    try {
       if (cmd.out === '-') {
-        stdout.write(b64);
+        stdout.write(payload);
       } else {
-        await fsp.writeFile(cmd.out, b64, { encoding: 'utf8' });
+        await new Promise<void>((resolveWrite, rejectWrite) => {
+          output.stream.once('error', rejectWrite);
+          output.stream.end(payload, resolveWrite);
+        });
       }
-      return;
-    }
-
-    if (cmd.out === '-') {
-      // Raw binary to STDOUT
-      stdout.write(buf);
-    } else {
-      await fsp.writeFile(cmd.out, buf);
+      await output.commit();
+    } catch (err) {
+      await output.rollback();
+      throw err;
     }
   });
 

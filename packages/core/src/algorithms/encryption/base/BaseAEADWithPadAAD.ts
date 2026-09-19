@@ -244,14 +244,13 @@ export abstract class BaseAEADWithPadAAD implements EncryptionAlgorithm {
       toEncrypt = this.padding.pad(plain, rng, this.padAlign);
     }
 
-    const aad = this.composeAAD(effective);
-    const out = await this.encryptWithAAD(toEncrypt, aad);
-
-    // Zeroize plaintext (and padded variant if different)
-    plain.fill(0);
-    if (toEncrypt !== plain) toEncrypt.fill(0);
-
-    return out;
+    try {
+      const aad = this.composeAAD(effective);
+      return await this.encryptWithAAD(toEncrypt, aad);
+    } finally {
+      plain.fill(0);
+      if (toEncrypt !== plain) toEncrypt.fill(0);
+    }
   }
 
   /**
@@ -281,7 +280,7 @@ export abstract class BaseAEADWithPadAAD implements EncryptionAlgorithm {
     // 1) Try new-format AAD first
     try {
       const plain = await this.decryptWithAAD(data, newAAD);
-      return this.enforcePolicyAfterDecrypt(plain, effective);
+      return this.enforceAndWipeOnError(plain, effective);
     } catch (primaryErr) {
       // 2) Optionally retry legacy AADs
       if (!this.allowLegacyAADFallback) throw primaryErr;
@@ -298,7 +297,7 @@ export abstract class BaseAEADWithPadAAD implements EncryptionAlgorithm {
             this.legacyFallbackPolicy === 'auto'
               ? 'auto'
               : (this.legacyFallbackPolicy as Exclude<PaddingAADMode, 'auto'>);
-          return this.enforcePolicyAfterDecrypt(plainLegacy, legacyMode);
+          return this.enforceAndWipeOnError(plainLegacy, legacyMode);
         } catch (e) {
           lastErr = e;
         }
@@ -342,6 +341,18 @@ export abstract class BaseAEADWithPadAAD implements EncryptionAlgorithm {
 
     // 'auto' (legacy behavior): strip if present, else pass through
     return used ? new Uint8Array(unpadded) : plain;
+  }
+
+  private enforceAndWipeOnError(
+    plain: Uint8Array,
+    mode: PaddingAADMode,
+  ): Uint8Array {
+    try {
+      return this.enforcePolicyAfterDecrypt(plain, mode);
+    } catch (err) {
+      plain.fill(0);
+      throw err;
+    }
   }
 
   // ---------------- abstract hooks for subclasses ----------------
