@@ -4,8 +4,7 @@ import { DecryptionError } from '../errors/index.js';
 import { ensureUint8Array } from '../util/convert.js';
 import {
   buildStreamRecordAAD,
-  decodeFrameLen,
-  decodeStreamRecord,
+  decodeCipherRecord,
   FRAME_HEADER_BYTES,
   MAX_CIPHER_FRAME_SIZE,
   type StreamFormat,
@@ -142,16 +141,12 @@ export class DecryptTransform {
   }
 
   private readRecord(buf: Uint8Array, offset: number) {
-    const record = this.format === 'authenticated-v1'
-      ? decodeStreamRecord(buf, offset)
-      : { length: decodeFrameLen(buf, offset), terminal: false, word: 0 };
-    const minFrame = this.engine.IV_LENGTH + this.engine.TAG_LENGTH;
-    if (record.length < minFrame || record.length > MAX_CIPHER_FRAME_SIZE) {
-      throw new DecryptionError(
-        `Invalid frame length ${record.length} (min=${minFrame}, max=${MAX_CIPHER_FRAME_SIZE})`,
-      );
-    }
-    return record;
+    return decodeCipherRecord(
+      buf,
+      this.format,
+      this.engine.IV_LENGTH + this.engine.TAG_LENGTH,
+      offset,
+    );
   }
 
   private async decryptRecord(

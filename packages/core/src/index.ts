@@ -41,6 +41,7 @@ import {
 
 import { EngineManager, type Engine } from './engine/EngineManager.js';
 import {
+  decodeCipherRecord,
   decodeStreamRecord,
   FRAME_HEADER_BYTES,
   MAX_CIPHER_FRAME_SIZE,
@@ -80,6 +81,8 @@ export interface CryptitOptions {
   streamFormat? : StreamFormat;
   /** Highest KDF difficulty accepted from ciphertext headers; defaults to high */
   maxDecryptionDifficulty? : Difficulty;
+  /** Reject legacy file/stream framing before key derivation; defaults to false */
+  requireAuthenticatedStream? : boolean;
   /** Enable legacy file and text decryption version < 1.0.0 */
   acceptUnauthenticatedHeader?    : boolean;
   /** Verbosity level 0-4 for logging (0 = errors only) */
@@ -104,6 +107,7 @@ export class Cryptit {
   private stream     : StreamProcessor;
   private streamFormat: StreamFormat;
   private maxDecryptionDifficulty: Difficulty;
+  private readonly requireAuthenticatedStream: boolean;
 
   private acceptUnauthenticatedHeader: boolean;
 
@@ -124,6 +128,20 @@ export class Cryptit {
     private readonly provider: CryptoProvider,
     opt: CryptitOptions = {},
   ) {
+    if (opt.maxDecryptionDifficulty !== undefined &&
+        !['low', 'middle', 'high'].includes(opt.maxDecryptionDifficulty)) {
+      throw new ConfigError('maxDecryptionDifficulty must be low, middle, or high');
+    }
+    if (opt.streamFormat !== undefined &&
+        opt.streamFormat !== 'legacy' && opt.streamFormat !== 'authenticated-v1') {
+      throw new ConfigError('streamFormat must be legacy or authenticated-v1');
+    }
+    for (const option of ['requireAuthenticatedStream', 'acceptUnauthenticatedHeader'] as const) {
+      if (opt[option] !== undefined && typeof opt[option] !== 'boolean') {
+        throw new ConfigError(`${option} must be a boolean`);
+      }
+    }
+    this.requireAuthenticatedStream = opt.requireAuthenticatedStream ?? false;
     this.v          = SchemeRegistry.get(opt.scheme ?? SchemeRegistry.current.id);
     this.cipher     = new this.v.cipher(provider);
     this.kdf        = this.v.kdf;
@@ -213,7 +231,8 @@ export class Cryptit {
    *   • chunk statistics for file/stream containers
    *   • IV/nonce & auth -tag for single -block text containers
    *
-   * This never decrypts - it merely parses framing bytes.
+  * This never decrypts or verifies authentication - it merely parses framing bytes.
+  * `authenticated` describes the stream format, not a verified authentication tag.
    */
   static async decodeData(
     input: string | Uint8Array | Blob | RandomAccessSource,
@@ -293,6 +312,9 @@ export class Cryptit {
       } as const;
     }
 
+    if (remain < FRAME_HEADER_BYTES) {
+      throw new InvalidHeaderError('Ciphertext too short for IV & tag');
+    }
     const first4   = await src.read(headerLen, 4);
     const firstLen = new DataView(first4.buffer, first4.byteOffset, 4)
                       .getUint32(0, false);
@@ -331,10 +353,9 @@ export class Cryptit {
     }
 
     // ——— single-block (encryptText) ———
-    const cipher      = await src.read(headerLen, remain);
     const ivLen       = SchemeRegistry.get(scheme).cipher.IV_LENGTH;
     const tagLen      = SchemeRegistry.get(scheme).cipher.TAG_LENGTH
-    if (cipher.length < ivLen + tagLen) {
+    if (remain < ivLen + tagLen) {
       throw new InvalidHeaderError('Ciphertext too short for IV & tag');
     }
 
@@ -343,9 +364,9 @@ export class Cryptit {
       // full encrypted payload length (including IV+cipher+tag)
       payloadLength: remain - ivLen - tagLen,
       params: {
-        iv : cipher.slice(0, ivLen),
+        iv : await src.read(headerLen, ivLen),
         ivLength: ivLen,
-        tag: cipher.slice(cipher.length - tagLen),
+        tag: await src.read(totalLen - tagLen, tagLen),
         tagLength: tagLen,
       },
     } as const;
@@ -535,6 +556,9 @@ export class Cryptit {
 
       this.log.log(3, 'Selecting decryption engine');
       engine = EngineManager.getEngine(this.provider, hdr.scheme);
+      if (container.length - hdr.headerLen < engine.cipher.IV_LENGTH + engine.cipher.TAG_LENGTH) {
+        throw new DecryptionError('Ciphertext too short for IV & tag');
+      }
 
       this.log.log(2, `Deriving key via engine for scheme: ${hdr.scheme}`);
       this.log.log(3, `Salt use: ${base64Encode(hdr.salt)}, KDF difficulty: ${hdr.difficulty}`);
@@ -684,9 +708,24 @@ export class Cryptit {
     try {
       const header = await Cryptit.peekHeader(file);
       const parsed = decodeHeader(header);
+      this.assertStreamFormat(parsed.streamFormat);
       engine = EngineManager.getEngine(this.provider, parsed.scheme);
       this.assertDecryptionDifficulty(parsed.difficulty);
-      
+      const payloadLength = file.size - parsed.headerLen;
+      if (payloadLength !== 0 || parsed.streamFormat === 'authenticated-v1') {
+        if (payloadLength < FRAME_HEADER_BYTES) {
+          throw new DecryptionError('Truncated ciphertext: missing or incomplete first frame');
+        }
+        const prefix = new Uint8Array(await file.slice(
+          parsed.headerLen, parsed.headerLen + FRAME_HEADER_BYTES,
+        ).arrayBuffer());
+        const record = decodeCipherRecord(
+          prefix, parsed.streamFormat, engine.cipher.IV_LENGTH + engine.cipher.TAG_LENGTH,
+        );
+        if (FRAME_HEADER_BYTES + record.length > payloadLength) {
+          throw new DecryptionError('Truncated ciphertext: incomplete first frame');
+        }
+      }
 
       try {
         await EngineManager.deriveKey(engine, secret, parsed.salt, parsed.difficulty);
@@ -895,15 +934,23 @@ export class Cryptit {
             return;
           }
 
-          // Initialize engine and derive key
-          const engine = EngineManager.getEngine(provider, parsed.scheme);
           try {
+            this.assertStreamFormat(parsed.streamFormat);
             this.assertDecryptionDifficulty(parsed.difficulty);
+            if (buf.length < hdrLen + FRAME_HEADER_BYTES) return;
+            const descriptor = SchemeRegistry.get(parsed.scheme);
+            decodeCipherRecord(
+              buf,
+              parsed.streamFormat,
+              descriptor.cipher.IV_LENGTH + descriptor.cipher.TAG_LENGTH,
+              hdrLen,
+            );
           } catch (err) {
             zeroizeString(secret);
             ctl.error(err instanceof Error ? err : new DecryptionError('KDF policy rejected ciphertext'));
             return;
           }
+          const engine = EngineManager.getEngine(provider, parsed.scheme);
           try {
             try {
               await EngineManager.deriveKey(engine, secret, parsed.salt, parsed.difficulty);
@@ -949,7 +996,12 @@ export class Cryptit {
       flush: async () => {
         if (!downstream) {
           zeroizeString(secret);
-          throw new InvalidHeaderError('Header not found before end of stream');
+          pass = null;
+          const parsed = decodeHeader(buf);
+          this.assertStreamFormat(parsed.streamFormat);
+          this.assertDecryptionDifficulty(parsed.difficulty);
+          if (parsed.streamFormat === 'legacy' && buf.length === parsed.headerLen) return;
+          throw new DecryptionError('Truncated ciphertext: missing or incomplete first frame');
         }
         const writer = downstream.writable.getWriter();
         try {
@@ -1046,6 +1098,12 @@ export class Cryptit {
   private genSalt<S extends SaltStrength>(strength: S = this.saltStrength as S): Uint8Array {
     const len = this.v.saltLengths[strength];
     return this.provider.getRandomValues(new Uint8Array(len));
+  }
+
+  private assertStreamFormat(format: StreamFormat): void {
+    if (this.requireAuthenticatedStream && format !== 'authenticated-v1') {
+      throw new DecryptionError('Authenticated stream required; legacy framing is disabled by policy');
+    }
   }
 
   private assertDecryptionDifficulty(difficulty: Difficulty): void {

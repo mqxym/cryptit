@@ -57,3 +57,40 @@ describe('Cryptit.decodeData - empty & too-short payloads', () => {
     await expect(Cryptit.decodeData(bad)).rejects.toThrow(InvalidHeaderError);
   });
 });
+
+describe('Cryptit.decodeData - bounded inspection', () => {
+  it.each([0, 1])('reads only metadata from large scheme %i text payloads', async scheme => {
+    const header = encodeHeader(scheme, 'low', 'low', new Uint8Array(12));
+    const length = 1024 ** 3;
+    const reads: number[] = [];
+    const source = {
+      length,
+      async read(offset: number, size: number): Promise<Uint8Array> {
+        reads.push(size);
+        if (size > 256) throw new Error('Inspection attempted a whole-payload read');
+        const bytes = new Uint8Array(size).fill(0xff);
+        if (offset === 0) bytes.set(header);
+        if (offset + size > length - 16) {
+          bytes.fill(0xa5, Math.max(0, length - 16 - offset));
+        }
+        return bytes;
+      },
+    };
+
+    const result = await Cryptit.decodeData(source);
+    expect(result.isChunked).toBe(false);
+    if (result.isChunked) throw new Error('Expected a text payload');
+    const ivLength = scheme === 0 ? 12 : 24;
+    expect(result.params.iv).toEqual(new Uint8Array(ivLength).fill(0xff));
+    expect(result.params.tag).toEqual(new Uint8Array(16).fill(0xa5));
+    expect(result.payloadLength).toBe(length - header.length - ivLength - 16);
+    expect(Math.max(...reads)).toBeLessThanOrEqual(256);
+  });
+
+  it.each([1, 2, 3])('rejects a %i-byte payload with a typed header error', async length => {
+    const header = encodeHeader(0, 'low', 'low', new Uint8Array(12));
+    const container = new Uint8Array(header.length + length);
+    container.set(header);
+    await expect(Cryptit.decodeData(container)).rejects.toThrow(InvalidHeaderError);
+  });
+});

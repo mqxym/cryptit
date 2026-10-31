@@ -6,6 +6,7 @@ import { tmpdir } from 'os';
 import { promises as fs } from 'fs';
 import { randomBytes } from 'crypto';
 import { execa } from 'execa';
+import { Cryptit } from '../../core/src/index.js';
 
 const CLI  = resolve(join(__dirname, '..', 'src', 'cli.ts'));
 const isBun = typeof Bun !== 'undefined' || !!process.env.BUN;
@@ -170,6 +171,48 @@ describe('cryptit CLI - bounded temporary input', () => {
       ], dir);
       expect(result.exitCode).not.toBe(0);
       expect(await fs.readdir(dir)).toEqual(['cipher.bin']);
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('cryptit CLI - authenticated stream policy', () => {
+  it.each([0, 1])('enforces strict reading for scheme %i without changing legacy defaults', async scheme => {
+    const dir = await fs.mkdtemp(`${tmpdir()}/cryptit-strict-`);
+    const plaintext = randomBytes(64);
+    try {
+      await fs.writeFile(join(dir, 'plain.bin'), plaintext);
+      const encrypted = await run([
+        'encrypt', 'plain.bin', '--scheme', String(scheme), '--difficulty', 'low',
+        '--pass', 'pw', '--out', 'cipher.bin',
+      ], dir);
+      expect(encrypted.exitCode).toBe(0);
+      const decrypted = await run([
+        'decrypt', 'cipher.bin', '--pass', 'pw', '--require-authenticated-stream',
+        '--out', 'restored.bin',
+      ], dir);
+      expect(decrypted.exitCode).toBe(0);
+      expect(await fs.readFile(join(dir, 'restored.bin'))).toEqual(plaintext);
+
+      const cipher = await fs.readFile(join(dir, 'cipher.bin'));
+      const metadata = await Cryptit.decodeHeader(cipher);
+      const header = cipher.subarray(0, 2 + metadata.saltLength);
+      header[1] &= ~0x08;
+      await fs.writeFile(join(dir, 'legacy.bin'), header);
+
+      const compatible = await run(['decrypt', 'legacy.bin', '--pass', 'pw'], dir);
+      expect(compatible.exitCode).toBe(0);
+      expect(compatible.stdout).toBe('');
+
+      const strict = await run([
+        'decrypt', 'legacy.bin', '--pass', 'pw', '--legacy',
+        '--require-authenticated-stream', '--out', 'restored.bin',
+      ], dir);
+      expect(strict.exitCode).not.toBe(0);
+      expect(strict.stderr).toMatch(/Authenticated stream required/);
+      expect(await fs.readFile(join(dir, 'restored.bin'))).toEqual(plaintext);
+      expect((await fs.readdir(dir)).some(name => name.includes('.cryptit-tmp-'))).toBe(false);
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
     }

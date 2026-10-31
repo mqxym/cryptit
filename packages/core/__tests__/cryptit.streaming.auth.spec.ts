@@ -3,6 +3,8 @@ import { decodeHeader } from '../src/header/decoder.js';
 import { nodeProvider } from '../../node-runtime/src/provider.js';
 import { collectStream } from '../src/util/stream.js';
 import { SCHEMES, randomBytes } from './test.constants.js';
+import { describe, expect, it, spyOn } from 'bun:test';
+import { EngineManager } from '../src/engine/EngineManager.js';
 
 const CHUNK_SIZE = 32;
 const TERMINAL_FLAG = 0x80000000;
@@ -131,5 +133,80 @@ describe.each(SCHEMES)('authenticated streaming integrity | scheme %i', scheme =
 
     expect(encrypted.size).toBe(decodeHeader(new Uint8Array(await encrypted.arrayBuffer())).headerLen);
     expect(decrypted.size).toBe(0);
+  });
+
+  it('preserves default legacy decoding but rejects downgrade-to-empty in strict mode before KDF', async () => {
+    const container = await encryptStream(makeCrypt(), randomBytes(CHUNK_SIZE));
+    const { header } = splitRecords(container);
+    header[1] &= ~0x08;
+    const file = new Blob([header as BufferSource]);
+
+    expect((await makeCrypt().decryptFile(file, 'wrong password')).size).toBe(0);
+    expect(await decryptStream(makeCrypt(), header)).toEqual(new Uint8Array(0));
+
+    const strict = new Cryptit(nodeProvider, {
+      requireAuthenticatedStream: true,
+      acceptUnauthenticatedHeader: true,
+    });
+    const derive = spyOn(EngineManager, 'deriveKey');
+    try {
+      await expect(strict.decryptFile(file, 'pw')).rejects.toThrow(/Authenticated stream required/);
+      await expect(decryptStream(strict, header)).rejects.toThrow(/Authenticated stream required/);
+      expect(derive).not.toHaveBeenCalled();
+    } finally {
+      derive.mockRestore();
+    }
+  });
+
+  it('strict mode accepts authenticated empty streams and still decrypts text', async () => {
+    const strict = new Cryptit(nodeProvider, {
+      scheme,
+      difficulty: 'low',
+      requireAuthenticatedStream: true,
+    });
+    const container = await encryptStream(makeCrypt(), new Uint8Array(0));
+    expect(await decryptStream(strict, container)).toEqual(new Uint8Array(0));
+    const file = new Blob([container as BufferSource]);
+    expect((await strict.decryptFile(file, 'pw')).size).toBe(0);
+    await expect(strict.decryptFile(file, 'wrong password')).rejects.toThrow();
+    const text = await strict.encryptText('text remains compatible', 'pw');
+    expect((await strict.decryptText(text.uint8array, 'pw')).text).toBe('text remains compatible');
+  });
+
+  it('rejects nonempty legacy streams in strict mode without changing the default reader', async () => {
+    const writer = new Cryptit(nodeProvider, { scheme, difficulty: 'low', streamFormat: 'legacy' });
+    const plain = randomBytes(CHUNK_SIZE);
+    const container = await encryptStream(writer, plain);
+    expect(await decryptStream(makeCrypt(), container)).toEqual(plain);
+    const strict = new Cryptit(nodeProvider, { requireAuthenticatedStream: true });
+    await expect(decryptStream(strict, container)).rejects.toThrow(/Authenticated stream required/);
+  });
+
+  it('accepts every split within the header and first frame word', async () => {
+    const plain = randomBytes(CHUNK_SIZE);
+    const container = await encryptStream(makeCrypt(), plain);
+    const { header } = splitRecords(container);
+    for (let split = 1; split < header.length + 4; split++) {
+      const transform = await makeCrypt().createDecryptionStream('pw');
+      const source = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(container.subarray(0, split));
+          controller.enqueue(container.subarray(split));
+          controller.close();
+        },
+      });
+      expect(await collectStream(source.pipeThrough(transform))).toEqual(plain);
+    }
+  });
+
+  it('does not equate authenticated-format inspection with successful authentication', async () => {
+    const container = await encryptStream(makeCrypt(), new Uint8Array(0));
+    container[container.length - 1] ^= 1;
+    expect(await Cryptit.decodeData(container)).toMatchObject({
+      isChunked: true,
+      format: 'authenticated-v1',
+      authenticated: true,
+    });
+    await expect(decryptStream(makeCrypt(), container)).rejects.toThrow();
   });
 });

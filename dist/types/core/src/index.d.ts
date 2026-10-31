@@ -32,6 +32,8 @@ export interface CryptitOptions {
     streamFormat?: StreamFormat;
     /** Highest KDF difficulty accepted from ciphertext headers; defaults to high */
     maxDecryptionDifficulty?: Difficulty;
+    /** Reject legacy file/stream framing before key derivation; defaults to false */
+    requireAuthenticatedStream?: boolean;
     /** Enable legacy file and text decryption version < 1.0.0 */
     acceptUnauthenticatedHeader?: boolean;
     /** Verbosity level 0-4 for logging (0 = errors only) */
@@ -70,6 +72,7 @@ export declare class Cryptit {
     private stream;
     private streamFormat;
     private maxDecryptionDifficulty;
+    private readonly requireAuthenticatedStream;
     private acceptUnauthenticatedHeader;
     private difficulty;
     private saltStrength;
@@ -115,7 +118,8 @@ export declare class Cryptit {
      *   • chunk statistics for file/stream containers
      *   • IV/nonce & auth -tag for single -block text containers
      *
-     * This never decrypts - it merely parses framing bytes.
+    * This never decrypts or verifies authentication - it merely parses framing bytes.
+    * `authenticated` describes the stream format, not a verified authentication tag.
      */
     static decodeData(input: string | Uint8Array | Blob | RandomAccessSource): Promise<DecodeDataResult>;
     /** Set the difficulty level for subsequent operations. */
@@ -221,6 +225,7 @@ export declare class Cryptit {
     private deriveKey;
     /** Generate a secure random salt according to configured length. */
     private genSalt;
+    private assertStreamFormat;
     private assertDecryptionDifficulty;
     /**
      * Read minimal bytes to extract and validate Cryptit header.

@@ -15,7 +15,7 @@ import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path
 import { toWebReadable, toWebWritable } from './streamAdapter.js';
 
 
-const PKG_VERSION = '2.5.1'; // sync with root package.json
+const PKG_VERSION = '2.6.0'; // sync with root package.json
 
 const DEFAULT_ROOT = process.cwd();
 
@@ -533,6 +533,7 @@ program
   .option('-p, --pass <passphrase>', 'passphrase (prompt if omitted)')
   .option('-o, --out <file>', 'output file (default STDOUT)', '-')
   .option('--legacy', 'Enable text decryption of version < 1.0.0', false)
+  .option('--require-authenticated-stream', 'reject legacy framing without whole-stream authentication', false)
   .action(async (src, cmd) => {
     
     if (src !== '-' && !existsSync(src)) {
@@ -548,6 +549,7 @@ program
       verbose: opts.verbose,
       scheme: opts.scheme,
       acceptUnauthenticatedHeader: cmd.legacy,
+      requireAuthenticatedStream: cmd.requireAuthenticatedStream,
     });
 
     const pass = await resolvePassphrase(opts, stdin.isTTY);

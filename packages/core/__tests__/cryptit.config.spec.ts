@@ -1,9 +1,15 @@
 /* ------------------------------------------------------------------
    Runtime‑configuration edge cases
    ------------------------------------------------------------------ */
-import { Cryptit }      from '../src/index.js';
+import { Cryptit, type CryptitOptions } from '../src/index.js';
 import { nodeProvider } from '../../node-runtime/src/provider.js';
 import { SchemeError, ConfigError }  from '../src/errors/index.js';
+import { describe, expect, it, spyOn } from 'bun:test';
+import { EngineManager } from '../src/engine/EngineManager.js';
+import { encodeHeader } from '../src/header/encoder.js';
+import { collectStream } from '../src/util/stream.js';
+import { concat } from '../src/util/bytes.js';
+import { encodeFrameLen, encodeStreamRecord, MAX_CIPHER_FRAME_SIZE } from '../src/util/frame.js';
 
 describe('Cryptit configuration guards', () => {
 
@@ -64,6 +70,17 @@ describe('Cryptit configuration guards', () => {
 });
 
 describe('Cryptit decryption resource policy', () => {
+  it.each([
+    { maxDecryptionDifficulty: 'invalid' },
+    { maxDecryptionDifficulty: null },
+    { requireAuthenticatedStream: 'false' },
+    { requireAuthenticatedStream: null },
+    { acceptUnauthenticatedHeader: 'false' },
+    { streamFormat: 'unknown' },
+  ])('rejects invalid security configuration %j', options => {
+    expect(() => new Cryptit(nodeProvider, options as unknown as CryptitOptions)).toThrow(ConfigError);
+  });
+
   it('rejects ciphertext above the configured KDF ceiling', async () => {
     const writer = new Cryptit(nodeProvider, { difficulty: 'middle' });
     const encrypted = await writer.encryptText('policy check', 'pw');
@@ -71,5 +88,34 @@ describe('Cryptit decryption resource policy', () => {
 
     await expect(reader.decryptText(encrypted.uint8array, 'pw'))
       .rejects.toThrow(/exceeds configured maximum/);
+  });
+
+  it.each([0, 1])('rejects impossible scheme %i payloads before deriving a key', async scheme => {
+    const crypt = new Cryptit(nodeProvider);
+    const salt = new Uint8Array(12);
+    const header = encodeHeader(scheme, 'low', 'low', salt);
+    const authenticatedHeader = encodeHeader(scheme, 'low', 'low', salt, undefined, 'authenticated-v1');
+    const minimum = scheme === 0 ? 28 : 40;
+    const derive = spyOn(EngineManager, 'deriveKey');
+    try {
+      await expect(crypt.decryptText(concat(header, new Uint8Array(minimum - 1)), 'pw')).rejects.toThrow();
+      for (const body of [
+        new Uint8Array(0),
+        new Uint8Array(3),
+        encodeStreamRecord(minimum - 1),
+        encodeStreamRecord(MAX_CIPHER_FRAME_SIZE + 1),
+        encodeStreamRecord(minimum + 1, true),
+      ]) {
+        const file = new Blob([concat(authenticatedHeader, body) as BufferSource]);
+        await expect(crypt.decryptFile(file, 'pw')).rejects.toThrow();
+        const transform = await crypt.createDecryptionStream('pw');
+        await expect(collectStream(file.stream().pipeThrough(transform))).rejects.toThrow();
+      }
+      const truncated = new Blob([concat(header, encodeFrameLen(minimum)) as BufferSource]);
+      await expect(crypt.decryptFile(truncated, 'pw')).rejects.toThrow();
+      expect(derive).not.toHaveBeenCalled();
+    } finally {
+      derive.mockRestore();
+    }
   });
 });

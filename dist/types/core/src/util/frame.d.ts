@@ -12,6 +12,7 @@ export declare function assertStreamRecordIndex(recordIndex: bigint): void;
 export declare function encodeFrameLen(n: number): Uint8Array;
 export declare function encodeStreamRecord(length: number, terminal?: boolean): Uint8Array;
 export declare function decodeStreamRecord(buf: Uint8Array, off?: number): StreamRecord;
+export declare function decodeCipherRecord(buf: Uint8Array, format: StreamFormat, minFrame: number, offset?: number): StreamRecord;
 export declare function buildStreamRecordAAD(header: Uint8Array, recordIndex: bigint, record: Pick<StreamRecord, 'terminal' | 'word'>): Uint8Array;
 export declare function decodeFrameLen(buf: Uint8Array, off?: number): number;
 export declare const FRAME_HEADER_BYTES: 4;

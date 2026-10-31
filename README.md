@@ -213,6 +213,7 @@ echo "AQVWgYDH/rkR6Ymxv1W9NzFWTsvTTXsnEaLHPx+NlATmuwcqea5RlljX1ly16Px716I2yGX/Xs
 | `-s, --salt-strength <l>` | high    | 12 B vs 16 B salt    |
 | `-c, --chunk-size <n>`    | 524 288 | plaintext block size |
 | `-v, --verbose`           |  0 … 4  | repeat to increase   |
+| `--require-authenticated-stream` | false | `decrypt` only: reject legacy stream framing |
 
 Exit codes: **0** success · **1** any failure (invalid header, auth, I/O …)
 
@@ -248,19 +249,33 @@ Exit codes: **0** success · **1** any failure (invalid header, auth, I/O …)
   Re-encrypt legacy containers with the default format when old-reader support is
   no longer required.
 * `Cryptit.decodeData()` reports `format` and `authenticated` for chunked payloads.
+  These are structural observations, not cryptographic verification. The helper
+  never verifies tags or passwords. Binary text-payload inspection reads only
+  the header, nonce, and tag; Base64 string input is still decoded in memory.
+* Applications requiring whole-stream integrity should set
+  `{ requireAuthenticatedStream: true }` for `decryptFile()` and
+  `createDecryptionStream()`, or use `cryptit decrypt --require-authenticated-stream`.
+  This rejects legacy framing before key derivation, even with `--legacy` or
+  `acceptUnauthenticatedHeader` enabled. Text decryption is unaffected.
+  The default remains `false` so existing legacy files continue to decrypt.
+* Historical header-only empty files contain no authentication tag and cannot
+  verify a password. A modern container truncated to its header with the stream
+  flag cleared is indistinguishable from one of these files. Default-compatible
+  decoding therefore cannot promise whole-stream integrity for every accepted
+  payload; the strict option rejects this ambiguity along with legacy streams.
 * Services accepting untrusted ciphertext can set
   `{ maxDecryptionDifficulty: "low" | "middle" | "high" }` to reject a more
   expensive Argon2 profile before key derivation. The compatible default is `high`.
 
-* To decrypt data from versions prior to 1.0.0, there is a temporary solution:
+* To decrypt data from versions prior to 1.0.0, explicitly enable migration support:
 
   ```javascript
   const cryptit = createCryptit({ acceptUnauthenticatedHeader: true });
   ```
 
-  * This option will be removed in future releases because the header must always be authenticated.
+  * This relaxes header authentication and should only be enabled when required.
 * The padding tag for encrypted text in AAD is not required, so encrypted text from versions prior to 2.2.0 can still be decrypted with versions greater than 2.2.0.
-  * This backward compatibility will also be removed in future releases.
+  * Existing default legacy decoding is preserved by security updates.
 
 ---
 
@@ -283,7 +298,7 @@ bun install && bun run build && bun test
 * Salts generated per-ciphertext; never reused
 * AES-GCM refuses more than 2^32 encryption invocations with one loaded
   `CryptoKey`. Loading a different key starts an independent invocation budget.
-* File/stream records are sequence-authenticated and require an authenticated end marker
+* Authenticated-v1 file/stream records are sequence-authenticated and require an authenticated end marker
 * Mutable cipher state is isolated per operation and keys are cleared on completion or failure
 * CLI file output is written to a restrictive same-directory temporary file and
   renamed into place only after the complete operation succeeds
@@ -295,8 +310,9 @@ command exits successfully. A terminal authentication failure cannot retract byt
 already consumed from a pipe.
 
 Authentication of an individual stream record does not by itself prove that the
-whole stream is complete. Successful completion requires validation of the final
-authenticated empty terminal record. See [SECURITY.md](SECURITY.md) for reporting
+whole stream is complete. Authenticated-v1 completion requires validation of the
+final authenticated empty terminal record; legacy framing has no such guarantee.
+See [SECURITY.md](SECURITY.md) for reporting
 instructions and the complete security boundary.
 
 ---

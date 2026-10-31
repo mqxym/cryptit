@@ -1,4 +1,6 @@
 // packages/core/src/util/frame.ts
+import { DecryptionError } from '../errors/index.js';
+
 const LEN_BYTES = 4 as const;
 const TERMINAL_FLAG = 0x80000000;
 const LENGTH_MASK = 0x7fffffff;
@@ -42,6 +44,26 @@ export function decodeStreamRecord(buf: Uint8Array, off = 0): StreamRecord {
     terminal: (word & TERMINAL_FLAG) !== 0,
     word,
   };
+}
+
+export function decodeCipherRecord(
+  buf: Uint8Array,
+  format: StreamFormat,
+  minFrame: number,
+  offset = 0,
+): StreamRecord {
+  const record = format === 'authenticated-v1'
+    ? decodeStreamRecord(buf, offset)
+    : { length: decodeFrameLen(buf, offset), terminal: false, word: 0 };
+  if (record.length < minFrame || record.length > MAX_CIPHER_FRAME_SIZE) {
+    throw new DecryptionError(
+      `Invalid frame length ${record.length} (min=${minFrame}, max=${MAX_CIPHER_FRAME_SIZE})`,
+    );
+  }
+  if (record.terminal && record.length !== minFrame) {
+    throw new DecryptionError('Invalid authenticated stream terminator length');
+  }
+  return record;
 }
 
 export function buildStreamRecordAAD(
