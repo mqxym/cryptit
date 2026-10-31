@@ -7,6 +7,7 @@ import { promises as fs } from 'fs';
 import { randomBytes } from 'crypto';
 import { execa } from 'execa';
 import { Cryptit } from '../../core/src/index.js';
+import { CLI_PRELOAD } from '../../core/__tests__/setup.js';
 
 const CLI  = resolve(join(__dirname, '..', 'src', 'cli.ts'));
 const isBun = typeof Bun !== 'undefined' || !!process.env.BUN;
@@ -17,7 +18,7 @@ const run = (
   options: { env?: Record<string, string>; input?: string | Buffer } = {},
 ) => {
   const bin   = isBun ? 'bun' : 'node';
-  const extra = isBun ? [] : ['--loader', NODE_LOADER];
+  const extra = isBun ? CLI_PRELOAD : ['--loader', NODE_LOADER];
   return execa(bin, [...extra, CLI, ...args], {
     encoding: 'utf8',
     reject: false,          // do not throw on exitCode ≠ 0

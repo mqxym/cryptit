@@ -2,7 +2,7 @@
    File encryption edge cases: chunk-boundary payload sizes and
    header-driven scheme auto-detection on decrypt.
    ------------------------------------------------------------------ */
-import { makeCrypt, randomBytes } from './test.constants.js';
+import { makeCrypt, randomBytes } from './setup.js';
 
 describe('Cryptit file chunk-boundary sizes', () => {
   const CHUNK = 4096;

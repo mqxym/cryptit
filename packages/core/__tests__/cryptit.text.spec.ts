@@ -4,7 +4,7 @@ import { DecryptionError } from '../src/errors/index.js';
 import { browserProvider } from '../../browser-runtime/src/provider.js';
 import type { CryptoProvider } from '../src/providers/CryptoProvider.js';
 import { EncryptionError } from '../src/errors/index.js';
-import { SCHEMES } from './test.constants.js';
+import { SCHEMES } from './setup.js';
 
 describe.each(SCHEMES)('Cryptit text helpers (scheme %i)', scheme => {
   let crypt: Cryptit;

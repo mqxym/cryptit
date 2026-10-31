@@ -8,7 +8,7 @@ import { execa } from 'execa';
 import { Cryptit } from '../../core/src/index.js';
 import { promises as fs }  from 'fs';
 import { browserProvider } from '../../browser-runtime/src/provider.js';
-import { SCHEMES } from './test.constants.js';
+import { CLI_PRELOAD, SCHEMES } from './setup.js';
 
 const CLI     = resolve(join(__dirname, '..', '..', 'node-runtime', 'src', 'cli.ts'));
 
@@ -17,7 +17,7 @@ const NODE_LOADER = 'ts-node/esm';      // keep for Node path
 
 async function runCli(args: string[]): Promise<string> {
   const bin   = isBun ? 'bun' : 'node';
-  const extra = isBun ? [] : ['--loader', NODE_LOADER];
+  const extra = isBun ? CLI_PRELOAD : ['--loader', NODE_LOADER];
   return execa(bin, [...extra, CLI, ...args], { encoding: 'utf8' })
     .then(res => res.stdout.trim());
 }

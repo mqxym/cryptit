@@ -1,6 +1,6 @@
 import { Cryptit } from '../src/index.js';
 import { nodeProvider } from '../../node-runtime/src/provider.js';
-import { SCHEMES } from './test.constants.js';
+import { SCHEMES } from './setup.js';
 
 describe.each(SCHEMES)('Cryptit round-trip sanity (scheme %i)', scheme => {
   let crypt: Cryptit;

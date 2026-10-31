@@ -2,14 +2,14 @@ import { join, resolve } from 'path';
 import { promises as fs } from 'fs';
 import { randomBytes } from 'crypto';
 import { execa } from 'execa';
-import { SCHEMES } from '../../core/__tests__/test.constants';
+import { CLI_PRELOAD, SCHEMES } from '../../core/__tests__/setup.js';
 
 const CLI  = resolve(join(__dirname, '..', 'src', 'cli.ts'));
 const isBun = typeof Bun !== 'undefined' || !!process.env.BUN;
 const NODE_LOADER = 'ts-node/esm';
 const run = (args: string[]) => {
   const bin   = isBun ? 'bun' : 'node';
-  const extra = isBun ? [] : ['--loader', NODE_LOADER];
+  const extra = isBun ? CLI_PRELOAD : ['--loader', NODE_LOADER];
   return execa(bin, [...extra, CLI, ...args], { encoding: 'utf8' });
 };
 

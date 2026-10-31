@@ -5,7 +5,7 @@
 import { Cryptit }                    from '../src/index.js';
 import { ConvertibleInput }           from '../src/util/Convertible.js';
 import { DecryptionError, DecodingError } from '../src/errors/index.js';
-import { makeCrypt, randomBytes, SCHEMES } from './test.constants.js';
+import { makeCrypt, randomBytes, SCHEMES } from './setup.js';
 
 describe.each(SCHEMES)('Cryptit text edge cases (scheme %i)', scheme => {
   it('round-trips raw binary covering all 256 byte values', async () => {

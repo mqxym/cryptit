@@ -5,7 +5,7 @@ import { Cryptit } from '../src/index.js';
 import { nodeProvider } from '../../node-runtime/src/provider.js';
 import { base64Decode, base64Encode } from '../src/util/bytes.js';
 import { DecryptionError } from '../src/errors/index.js';
-import { SCHEMES } from './test.constants.js';
+import { SCHEMES } from './setup.js';
 import { collectStream as collect } from '../src/util/stream.js';
 
 function flipBit(buf: Uint8Array, byteIndex = 1, mask = 0x01): Uint8Array {

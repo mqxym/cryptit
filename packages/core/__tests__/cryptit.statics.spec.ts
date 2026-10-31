@@ -3,7 +3,7 @@
    These never decrypt - they only parse framing & header metadata.
    ------------------------------------------------------------------ */
 import { Cryptit }            from '../src/index.js';
-import { makeCrypt, SCHEMES } from './test.constants.js';
+import { makeCrypt, SCHEMES } from './setup.js';
 
 /* ── isEncrypted ─────────────────────────────────────────────────── */
 describe('Cryptit.isEncrypted', () => {

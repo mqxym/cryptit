@@ -1,7 +1,7 @@
 import { Cryptit } from '../src/index.js';
 import { nodeProvider } from '../../node-runtime/src/provider.js';
 import { collectStream } from '../src/util/stream.js';
-import { SCHEMES, randomBytes } from './test.constants.js';
+import { SCHEMES, randomBytes } from './setup.js';
 
 function concat(...parts: Uint8Array[]): Uint8Array {
   const output = new Uint8Array(parts.reduce((total, part) => total + part.length, 0));

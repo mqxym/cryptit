@@ -1,5 +1,6 @@
 import { join, resolve } from 'path';
 import { execa } from 'execa';
+import { CLI_PRELOAD } from '../../core/__tests__/setup.js';
 
 /* ------------------------------------------------------------------ */
 /*  Paths & runtime selector                                           */
@@ -13,7 +14,7 @@ const run = (args: string | string[], input?: string | Buffer) => {
   const arr = Array.isArray(args) ? args : [args];
   if (isBun) {
     // Bun supports TS out of the box
-    return execa('bun', [CLI, ...arr], { input, encoding: 'utf8' });
+    return execa('bun', [...CLI_PRELOAD, CLI, ...arr], { input, encoding: 'utf8' });
   } else {
     // Node needs the loader flag for ESM TS
     return execa('node', ['--loader', NODE_LOADER, CLI, ...arr], {

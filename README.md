@@ -287,6 +287,18 @@ cd cryptit
 bun install && bun run build && bun test
 ```
 
+### Tests
+
+`bun test` preloads [setup.ts](packages/core/__tests__/setup.ts) for every suite.
+It provides shared test helpers and replaces both `argon2-browser` and
+`@node-rs/argon2` with the same deterministic SHA-256-based digest mock, avoiding
+native/WASM Argon2 work. CLI test subprocesses explicitly preload the same setup.
+These mocks are test-only and are not cryptographically secure or Argon2-compatible.
+
+The immutable compatibility vectors still run with real Argon2 in an isolated
+subprocess as part of the default suite. To run any suite with real Argon2 instead
+of mocks, use `CRYPTIT_TEST_REAL_ARGON2=1 bun test`.
+
 ---
 
 ## Security

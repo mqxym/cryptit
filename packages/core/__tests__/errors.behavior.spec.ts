@@ -10,7 +10,7 @@ import {
   DecodingError,
 }                        from '../src/errors/index.js';
 import { base64Decode }  from '../src/util/bytes.js';
-import { makeCrypt }     from './test.constants.js';
+import { makeCrypt }     from './setup.js';
 
 describe('Typed configuration errors', () => {
   it('setChunkSize range violation throws a ConfigError (a CryptitError)', () => {

@@ -3,7 +3,7 @@ import { nodeProvider } from '../../node-runtime/src/provider.js';
 import { base64Decode, base64Encode } from '../src/util/bytes.js';
 import { decodeHeader } from '../src/header/decoder.js';
 import { DecryptionError } from '../src/errors/index.js';
-import { SCHEMES } from './test.constants.js';
+import { SCHEMES } from './setup.js';
 
 function flipBit(buf: Uint8Array, i = 0): Uint8Array {
   const out = buf.slice();

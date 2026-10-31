@@ -12,7 +12,7 @@ import {
   assertStreamRecordIndex,
   MAX_STREAM_RECORD_INDEX,
 } from '../../src/util/frame.js';
-import { makeCrypt, randomBytes, SCHEMES } from '../test.constants.js';
+import { makeCrypt, randomBytes, SCHEMES } from '../setup.js';
 
 /* Echo engine with realistic IV/TAG sizing so min-frame maths are exercised. */
 class NopEngine implements EncryptionAlgorithm {

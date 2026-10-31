@@ -2,7 +2,7 @@ import { Cryptit } from '../src/index.js';
 import { decodeHeader } from '../src/header/decoder.js';
 import { nodeProvider } from '../../node-runtime/src/provider.js';
 import { collectStream } from '../src/util/stream.js';
-import { SCHEMES, randomBytes } from './test.constants.js';
+import { SCHEMES, randomBytes } from './setup.js';
 import { describe, expect, it, spyOn } from 'bun:test';
 import { EngineManager } from '../src/engine/EngineManager.js';
 

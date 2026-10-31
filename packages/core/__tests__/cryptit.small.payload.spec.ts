@@ -3,7 +3,7 @@
    ------------------------------------------------------------------ */
 import { Cryptit } from '../src/index.js';
 import { nodeProvider } from '../../node-runtime/src/provider.js';
-import { SCHEMES } from './test.constants.js';
+import { SCHEMES } from './setup.js';
 
 const SINGLE_BYTE = new Blob([Uint8Array.of(0xA5)]);
 
