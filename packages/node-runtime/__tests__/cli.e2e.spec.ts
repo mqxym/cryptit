@@ -29,6 +29,18 @@ const run = (args: string | string[], input?: string | Buffer) => {
 /*  Tests                                                              */
 /* ------------------------------------------------------------------ */
 describe('cryptit (CLI)', () => {
+  it.each(['8', '127'])('accepts scheme ID %s but requires registration', async scheme => {
+    await expect(Promise.resolve(run(['encrypt-text', 'hello', '--pass', 'pw', '--scheme', scheme])))
+      .rejects.toMatchObject({ stderr: expect.stringContaining(`Unknown scheme: ${scheme}`) });
+  });
+
+  it.each(['-1', '128', '1.5'])('rejects scheme ID %s outside the header range', async scheme => {
+    await expect(Promise.resolve(run(['encrypt-text', 'hello', '--pass', 'pw', '--scheme', scheme])))
+      .rejects.toMatchObject({
+        stderr: expect.stringContaining('Scheme ID must be an integer between 0 and 127'),
+      });
+  });
+
   it('encrypt-text | decrypt-text round-trip', async () => {
     const enc = await run(['encrypt-text', 'hello', '--pass', 'pw']);
     expect(enc.stdout).toMatch(/^[A-Za-z0-9+/]+=*$/);

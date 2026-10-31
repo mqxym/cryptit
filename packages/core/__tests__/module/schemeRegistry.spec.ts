@@ -19,7 +19,15 @@ describe('SchemeRegistry', () => {
   it('rejects ids that cannot be represented in the header', () => {
     const current = SchemeRegistry.current;
     expect(() => SchemeRegistry.register({ ...current, id: -1 })).toThrow(SchemeError);
-    expect(() => SchemeRegistry.register({ ...current, id: 8 })).toThrow(SchemeError);
+    expect(() => SchemeRegistry.register({ ...current, id: 128 })).toThrow(SchemeError);
     expect(() => SchemeRegistry.register({ ...current, id: 1.5 })).toThrow(SchemeError);
+    expect(() => SchemeRegistry.register({ ...current, id: NaN })).toThrow(SchemeError);
+    expect(() => SchemeRegistry.register({ ...current, id: Infinity })).toThrow(SchemeError);
+  });
+
+  it('accepts extended scheme IDs', () => {
+    const descriptor = { ...SchemeRegistry.current, id: 126 };
+    SchemeRegistry.register(descriptor);
+    expect(SchemeRegistry.get(126)).toBe(descriptor);
   });
 });

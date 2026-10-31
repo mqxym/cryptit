@@ -14,13 +14,42 @@ describe('header encode/decode', () => {
     expect(Array.from(dec.salt)).toEqual(Array.from(salt));
   });
 
+  it('preserves the wire layout for every supported header combination', () => {
+    const difficulties = ['low', 'middle', 'high'] as const;
+    const strengths = ['low', 'high'] as const;
+    const formats = ['legacy', 'authenticated-v1'] as const;
+
+    for (const scheme of [0, 1, 2]) {
+      for (const [difficultyCode, difficulty] of difficulties.entries()) {
+        for (const saltStrength of strengths) {
+          for (const streamFormat of formats) {
+            const salt = new Uint8Array(saltStrength === 'high' ? 16 : 12).fill(9);
+            const header = encodeHeader(
+              scheme, difficulty, saltStrength, salt, undefined, streamFormat,
+            );
+            const expectedInfo = (scheme << 5)
+              | (streamFormat === 'authenticated-v1' ? 0x08 : 0)
+              | (saltStrength === 'high' ? 0x04 : 0)
+              | difficultyCode;
+
+            expect(Array.from(header)).toEqual([0x01, expectedInfo, ...salt]);
+            expect(decodeHeader(header)).toEqual({
+              scheme, difficulty, saltStrength, salt, streamFormat,
+              headerLen: 2 + salt.length,
+            });
+          }
+        }
+      }
+    }
+  });
+
   it('detects bad magic byte', () => {
     const broken = encodeHeader(0, 'low', 'low', salt).slice();
     broken[0] = 0xFF;
     expect(() => decodeHeader(broken)).toThrow(InvalidHeaderError);
   });
 
-  it('rejects unsupported reserved header flags', () => {
+  it('rejects an extension marker without enough salt for the second info byte', () => {
     const header = encodeHeader(0, 'low', 'low', new Uint8Array(12));
     header[1] |= 0x10;
     expect(() => decodeHeader(header)).toThrow();

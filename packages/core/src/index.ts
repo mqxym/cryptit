@@ -5,7 +5,13 @@ import './config/defaults.js';
 import type { CryptoProvider }    from './providers/CryptoProvider.js';
 import { Difficulty, SaltStrength } from './config/defaults.js';
 import { encodeHeader }             from './header/encoder.js';
-import { decodeHeader }             from './header/decoder.js';
+import { decodeHeader, decodeHeaderPrefix } from './header/decoder.js';
+import {
+  HEADER_EXTENDED_INFO_BIT,
+  HEADER_EXTENDED_PREFIX_LENGTH,
+  HEADER_INFO_BYTE_OFFSET,
+  HEADER_PREFIX_LENGTH,
+} from './header/constants.js';
 import {
   KeyDerivation,
   PaddingAwareEncryptionAlgorithm,
@@ -844,7 +850,6 @@ export class Cryptit {
     let downstreamError: unknown = null;
 
     const MAX_HEADER_PREFIX = 64 * 1024;
-    const MIN_INFO_BYTES    = 2;
 
     const pipeOut = async (
       readable: ReadableStream<Uint8Array>,
@@ -892,18 +897,17 @@ export class Cryptit {
           }
 
           // Need at least the first 2 bytes to read "info"
-          if (buf.byteLength < MIN_INFO_BYTES) return;
+          if (buf.byteLength < HEADER_PREFIX_LENGTH) return;
 
-          // Determine required header length
-          const info         = buf[1];
-          const scheme       = info >> 5;
-          const saltStrength = ((info >> 2) & 1) ? 'high' : 'low';
+          if ((buf[HEADER_INFO_BYTE_OFFSET] & HEADER_EXTENDED_INFO_BIT) !== 0
+            && buf.byteLength < HEADER_EXTENDED_PREFIX_LENGTH) return;
 
           let hdrLen = 0;
           try {
+            const { scheme, saltStrength, prefixLength } = decodeHeaderPrefix(buf);
             const desc = SchemeRegistry.get(scheme);
-            const sLen = desc.saltLengths[saltStrength as 'low' | 'high'];
-            hdrLen     = 2 + sLen;
+            const sLen = desc.saltLengths[saltStrength];
+            hdrLen     = prefixLength + sLen;
           } catch (e) {
             zeroizeString(secret);
             ctl.error(new HeaderDecodeError(
@@ -1127,7 +1131,7 @@ export class Cryptit {
 
   private static async peekHeader(input: string | Uint8Array | Blob): Promise<Uint8Array> {
     const buf = await this.readAsUint8(input);
-    if (buf.length < 2) throw new InvalidHeaderError('Input too short');
+    if (buf.length < HEADER_PREFIX_LENGTH) throw new InvalidHeaderError('Input too short');
 
     const { headerLen } = decodeHeader(buf.length >= 32 ? buf : buf.slice());
 

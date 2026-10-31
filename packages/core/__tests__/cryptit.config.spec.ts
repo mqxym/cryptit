@@ -10,6 +10,8 @@ import { encodeHeader } from '../src/header/encoder.js';
 import { collectStream } from '../src/util/stream.js';
 import { concat } from '../src/util/bytes.js';
 import { encodeFrameLen, encodeStreamRecord, MAX_CIPHER_FRAME_SIZE } from '../src/util/frame.js';
+import { SchemeRegistry } from '../src/config/SchemeRegistry.js';
+import { SCHEMES } from './setup.js';
 
 describe('Cryptit configuration guards', () => {
 
@@ -46,9 +48,9 @@ describe('Cryptit configuration guards', () => {
   });
 
   /* ── scheme guards ─────────────────────────────────────────────── */
-  it('setScheme(8) → SchemeError (id outside registry)', () => {
+  it('setScheme(125) → SchemeError (id outside registry)', () => {
     const fresh = new Cryptit(nodeProvider);
-    expect(() => fresh.setScheme(8)).toThrow(SchemeError);
+    expect(() => fresh.setScheme(125)).toThrow(SchemeError);
   });
 
   /* ── verbosity round-trips through getter ──────────────────────── */
@@ -90,12 +92,13 @@ describe('Cryptit decryption resource policy', () => {
       .rejects.toThrow(/exceeds configured maximum/);
   });
 
-  it.each([0, 1])('rejects impossible scheme %i payloads before deriving a key', async scheme => {
+  it.each(SCHEMES)('rejects impossible scheme %i payloads before deriving a key', async scheme => {
     const crypt = new Cryptit(nodeProvider);
     const salt = new Uint8Array(12);
     const header = encodeHeader(scheme, 'low', 'low', salt);
     const authenticatedHeader = encodeHeader(scheme, 'low', 'low', salt, undefined, 'authenticated-v1');
-    const minimum = scheme === 0 ? 28 : 40;
+    const cipher = SchemeRegistry.get(scheme).cipher;
+    const minimum = cipher.IV_LENGTH + cipher.TAG_LENGTH;
     const derive = spyOn(EngineManager, 'deriveKey');
     try {
       await expect(crypt.decryptText(concat(header, new Uint8Array(minimum - 1)), 'pw')).rejects.toThrow();

@@ -108,7 +108,7 @@ const { Cryptit: CryptitConstructor } = await import('../src/index.js');
 const { nodeProvider } = await import('../../node-runtime/src/provider.js');
 
 export const CLI_PRELOAD = ['--preload', fileURLToPath(import.meta.url)];
-export const SCHEMES = [0, 1];
+export const SCHEMES = [0, 1, 2];
 export const randomBytes = (n: number): Uint8Array =>
   crypto.getRandomValues(new Uint8Array(n));
 export const makeCrypt = (opt: CryptitOptions = {}): Cryptit =>

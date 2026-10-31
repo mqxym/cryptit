@@ -38,5 +38,16 @@ const v1: SchemeDescriptor = {
 
 SchemeRegistry.register(v1);
 
+const v2: SchemeDescriptor = {
+  id: 2,
+  cipher: AESGCM,
+  kdf: new Argon2KDF(VERSION_1_DIFFICULTIES),
+  saltLengths: { low: 12, high: 16 },
+  difficulties: VERSION_1_DIFFICULTIES,
+  defaultChunkSize: 512 * 1024,
+};
+
+SchemeRegistry.register(v2);
+
 export type SaltStrength = 'low' | 'high';
 export type Difficulty = keyof typeof DEFAULT_DIFFICULTIES;

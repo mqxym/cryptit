@@ -12,14 +12,29 @@ Modern, cross-platform encryption for both **files** *and* **text**.
 
 ## Scheme Support
 
-Currently there are 2 encryption schemes supported:
+Currently there are 3 encryption schemes supported:
 
 * **Scheme 0** (default): **AES-GCM 256** (native via Crypto API) and **Argon2id** (single thread parallelism setup using `argon2` or `argon2-browser`\*)
 * **Scheme 1**: **XChaCha20Poly1305** (via JavaScript engine `@noble/ciphers`) and and **Argon2id** (multi thread parallelism setup using `argon2` or `argon2-browser`\*)
+* **Scheme 2**: **AES-GCM 256** (native via Crypto API, non-extractable key) and **Argon2id** with the same presets as scheme 1.
 
 **\*** This means that for the same "difficulty" setting, the KDF will be significantly slower in the browser than in Node.js.
 
-The library can support up to 8 schemes via a header info byte (3 bit allocated).
+The header supports 128 scheme IDs (0-127) using 3 bits in the first info byte
+and an optional 4-bit extension in a second info byte. Built-in schemes are 0, 1, and 2.
+
+Schemes 1 and 2 share these Argon2id settings:
+
+| Difficulty | Memory (total) | Iterations | Parallelism (lanes) |
+|------------|----------------|------------|---------------------|
+| low        | 64 MiB         | 5          | 2                   |
+| middle     | 96 MiB         | 10         | 4                   |
+| high       | 96 MiB         | 20         | 4                   |
+
+Higher difficulty raises the cost of offline password guesses but does not make
+a weak password strong. Use a randomly generated password or passphrase. 
+Parallelism divides the total memory into lanes; it does not multiply
+the memory cost or guarantee that many execution threads in the browser.
 
 > [!WARNING]
 > Scheme 1 works with an extractable CryptoKey. If unsure use scheme 0.
@@ -204,16 +219,16 @@ echo "AQVWgYDH/rkR6Ymxv1W9NzFWTsvTTXsnEaLHPx+NlATmuwcqea5RlljX1ly16Px716I2yGX/Xs
 
 ### Common flags
 
-| Flag                      | Default | Description          |
-| ------------------------- | ------- | -------------------- |
-| `-p, --pass <pw>`         | prompt  | passphrase           |
-| `--pass-file <file>`      | none    | read passphrase from a file (max 64 KiB) |
-| `-d, --difficulty <l>`    | middle  | Argon2 preset        |
-| `-S, --scheme <0-1>.`     | 0.      | Scheme preset        |
-| `-s, --salt-strength <l>` | high    | 12 B vs 16 B salt    |
-| `-c, --chunk-size <n>`    | 524 288 | plaintext block size |
-| `-v, --verbose`           |  0 … 4  | repeat to increase   |
-| `--require-authenticated-stream` | false | `decrypt` only: reject legacy stream framing |
+| Flag                             | Default | Description                                  |
+| -------------------------------- | ------- | -------------------------------------------- |
+| `-p, --pass <pw>`                | prompt  | passphrase                                   |
+| `--pass-file <file>`             | none    | read passphrase from a file (max 64 KiB)     |
+| `-d, --difficulty <l>`           | middle  | Argon2 preset                                |
+| `-S, --scheme <0-127>`           | 0       | Registered scheme ID (built-in: 0-2)         |
+| `-s, --salt-strength <l>`        | high    | 12 B vs 16 B salt                            |
+| `-c, --chunk-size <n>`           | 524 288 | plaintext block size                         |
+| `-v, --verbose`                  |  0 … 4  | repeat to increase                           |
+| `--require-authenticated-stream` | false   | `decrypt` only: reject legacy stream framing |
 
 Exit codes: **0** success · **1** any failure (invalid header, auth, I/O …)
 
@@ -226,6 +241,14 @@ Exit codes: **0** success · **1** any failure (invalid header, auth, I/O …)
 ## Versioned format
 
 * Header: `0x01 | infoByte | salt`
+  Scheme IDs 0-7 retain this layout. For IDs 8-127, bit 4 of `infoByte`
+  signals `0x01 | infoByte | secondInfoByte | salt`. Bits 7-5 of the first
+  info byte hold the scheme's low 3 bits; bits 3-0 of the second hold its
+  high 4 bits. Bits 7-4 of the second byte are reserved and must be zero.
+  Salt starts at offset 2 for ordinary headers and offset 3 for extended headers.
+  Bits 1-0 of the first info byte encode difficulty (0 = low, 1 = middle,
+  2 = high; 3 is invalid), and bit 2 selects high salt strength.
+  Older readers reject extended headers; existing headers remain byte-compatible.
 * Decryptors pick the engine by the header’s scheme ⇒ **one CLI handles all registered schemes**.
 * Header info bit 3 marks an `authenticated-v1` file/stream container.
 * Authenticated streams bind every record to its zero-based ordinal, record type,

@@ -1,5 +1,7 @@
 import { Cryptit }      from '../src/index.js';
 import { nodeProvider } from '../../node-runtime/src/provider.js';
+import { SchemeRegistry } from '../src/config/SchemeRegistry.js';
+import { SCHEMES } from './setup.js';
 
 describe('Cryptit.decodeData (payload inspector)', () => {
   const crypt = new Cryptit(nodeProvider);
@@ -59,7 +61,7 @@ describe('Cryptit.decodeData - empty & too-short payloads', () => {
 });
 
 describe('Cryptit.decodeData - bounded inspection', () => {
-  it.each([0, 1])('reads only metadata from large scheme %i text payloads', async scheme => {
+  it.each(SCHEMES)('reads only metadata from large scheme %i text payloads', async scheme => {
     const header = encodeHeader(scheme, 'low', 'low', new Uint8Array(12));
     const length = 1024 ** 3;
     const reads: number[] = [];
@@ -80,7 +82,7 @@ describe('Cryptit.decodeData - bounded inspection', () => {
     const result = await Cryptit.decodeData(source);
     expect(result.isChunked).toBe(false);
     if (result.isChunked) throw new Error('Expected a text payload');
-    const ivLength = scheme === 0 ? 12 : 24;
+    const ivLength = SchemeRegistry.get(scheme).cipher.IV_LENGTH;
     expect(result.params.iv).toEqual(new Uint8Array(ivLength).fill(0xff));
     expect(result.params.tag).toEqual(new Uint8Array(16).fill(0xa5));
     expect(result.payloadLength).toBe(length - header.length - ivLength - 16);

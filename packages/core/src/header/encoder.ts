@@ -1,5 +1,13 @@
 // packages/core/src/header/encoder.ts
-import { HEADER_START_BYTE, HEADER_STREAM_AUTH_BIT } from './constants.js';
+import {
+  HEADER_EXTENDED_INFO_BIT,
+  HEADER_EXTENDED_SCHEME_BIT_SHIFT,
+  HEADER_HIGH_SALT_STRENGTH_BIT,
+  HEADER_SCHEME_BIT_SHIFT,
+  HEADER_SCHEME_LOW_BITS_MASK,
+  HEADER_START_BYTE,
+  HEADER_STREAM_AUTH_BIT,
+} from './constants.js';
 import { concat } from '../util/bytes.js';
 import { EncryptionAlgorithm } from '../types/index.js';
 import type { StreamFormat } from '../util/frame.js';
@@ -32,13 +40,18 @@ export function encodeHeader(
   }
 
   const diffCode = diffMap[difficulty];
+  const hasExtendedInfo = scheme > HEADER_SCHEME_LOW_BITS_MASK;
   const infoByte =
-    (scheme << 5) |
+    ((scheme & HEADER_SCHEME_LOW_BITS_MASK) << HEADER_SCHEME_BIT_SHIFT) |
+    (hasExtendedInfo ? HEADER_EXTENDED_INFO_BIT : 0) |
     (streamFormat === 'authenticated-v1' ? HEADER_STREAM_AUTH_BIT : 0) |
-    ((saltStrength === 'high' ? 1 : 0) << 2) |
+    (saltStrength === 'high' ? HEADER_HIGH_SALT_STRENGTH_BIT : 0) |
     diffCode;
 
-  const header = concat(new Uint8Array([HEADER_START_BYTE, infoByte]), salt);
+  const prefix = hasExtendedInfo
+    ? [HEADER_START_BYTE, infoByte, scheme >> HEADER_EXTENDED_SCHEME_BIT_SHIFT]
+    : [HEADER_START_BYTE, infoByte];
+  const header = concat(new Uint8Array(prefix), salt);
 
   // Make the *raw header bytes* the AAD for this message.
   if (cipher) cipher.setAAD(header);

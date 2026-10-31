@@ -11,11 +11,12 @@ import { FilesystemError } from '../../core/src/errors/index.js';
 import { FileByteSource } from '../../core/src/util/ByteSource.js';
 import { createCryptit } from './index.js';
 import { Cryptit } from '../../core/src/index.js';
+import { HEADER_MAX_SCHEME_ID } from '../../core/src/header/constants.js';
 import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { toWebReadable, toWebWritable } from './streamAdapter.js';
 
 
-const PKG_VERSION = '2.6.0'; // sync with root package.json
+const PKG_VERSION = '2.7.0'; // sync with root package.json
 
 const DEFAULT_ROOT = process.cwd();
 
@@ -203,11 +204,11 @@ program
   .showSuggestionAfterError()
 
   .addOption(
-    new Option('-S, --scheme <0-1>', 'encryption scheme version')
+    new Option('-S, --scheme <0-127>', 'registered encryption scheme ID (built-in: 0-2)')
       .argParser((v) => {
         const n = Number(v);
-        if (!Number.isInteger(n) || n < 0 || n > 7) {
-          throw new Error('Version size must be a integer between 0 and 7');
+        if (!Number.isInteger(n) || n < 0 || n > HEADER_MAX_SCHEME_ID) {
+          throw new Error(`Scheme ID must be an integer between 0 and ${HEADER_MAX_SCHEME_ID}`);
         }
         return n;
       })

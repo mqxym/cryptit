@@ -1,13 +1,14 @@
 // packages/core/src/config/SchemeRegistry.ts
 import { SchemeDescriptor } from "../types/index.js";
 import { SchemeError } from "../errors/index.js";
+import { HEADER_MAX_SCHEME_ID } from "../header/constants.js";
 
 export class SchemeRegistry {
   private static readonly byId = new Map<number, SchemeDescriptor>();
 
   static register(s: SchemeDescriptor): void {
-    if (!Number.isInteger(s.id) || s.id < 0 || s.id > 7) {
-      throw new SchemeError(`Scheme id must be an integer between 0 and 7: ${s.id}`);
+    if (!Number.isInteger(s.id) || s.id < 0 || s.id > HEADER_MAX_SCHEME_ID) {
+      throw new SchemeError(`Scheme id must be an integer between 0 and ${HEADER_MAX_SCHEME_ID}: ${s.id}`);
     }
     if (this.byId.has(s.id)) throw new SchemeError(`Scheme ${s.id} already registered`);
     this.byId.set(s.id, s);
