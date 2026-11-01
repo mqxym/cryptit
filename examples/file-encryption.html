@@ -89,7 +89,7 @@ For large files, please use the <a href="streaming.html"> streaming</a> version 
             <input type="password" value="abc" class="form-control" id="secret" placeholder="Enter passphrase">
           </div>
           <div class="col-md-4">
-            <label for="scheme" class="form-label">Scheme ID (0 - max. 7)</label>
+            <label for="scheme" class="form-label">Scheme ID (0 - max. 127)</label>
             <input type="number" min="0" value="0" class="form-control" id="scheme">
             <div class="form-text">0 = AES-GCM / Argon2id (single thread)</div>
             <div class="form-text">1 = XChaCha20-Poly1305 / Argon2id (multithread*)</div>
